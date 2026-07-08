@@ -26,7 +26,7 @@ class HomeScreen(Screen):
                     yield Button("Quit", id="quit", variant="error")
 
             with Vertical(classes="panel"):
-                yield Static("Roadmap — other TotalSegmentator tasks (coming soon)", classes="section-title")
+                yield Static("Roadmap — additional craniofacial tasks (coming soon)", classes="section-title")
                 with Horizontal():
                     for name, desc in ROADMAP:
                         with Vertical(classes="roadmap-card"):

@@ -8,10 +8,10 @@ def test_engine_modules_import_cleanly():
 
 
 def test_unsupported_task_raises():
-    from autoanatomy.engine.api import totalsegmentator
+    from autoanatomy.engine.api import segment
 
     with pytest.raises(ValueError, match="craniofacial_structures"):
-        totalsegmentator(input=Path("does_not_matter.nii.gz"), output=None, task="total")
+        segment(input=Path("does_not_matter.nii.gz"), output=None, task="total")
 
 
 def _weights_cached() -> bool:
@@ -24,7 +24,7 @@ def _weights_cached() -> bool:
 
 @pytest.mark.skipif(not _weights_cached(), reason="model weights not downloaded (run `autoanatomy download-weights`)")
 def test_real_segmentation_produces_all_seven_masks(tmp_path):
-    from autoanatomy.engine.api import totalsegmentator
+    from autoanatomy.engine.api import segment
     from autoanatomy.engine.class_map import class_map
 
     atlas = Path(__file__).parent / "reference_files" / "ct_brain_atlas_1mm.nii.gz"
@@ -33,7 +33,7 @@ def test_real_segmentation_produces_all_seven_masks(tmp_path):
 
     import torch
     device = "gpu" if torch.cuda.is_available() else "cpu"
-    totalsegmentator(input=atlas, output=tmp_path, task="craniofacial_structures", device=device, quiet=True)
+    segment(input=atlas, output=tmp_path, task="craniofacial_structures", device=device, quiet=True)
 
     for name in class_map["craniofacial_structures"].values():
         assert (tmp_path / f"{name}.nii.gz").exists()

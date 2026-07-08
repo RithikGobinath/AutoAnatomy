@@ -472,7 +472,7 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
         else:
             img_in_orig = nib.load(file_in)
         if len(img_in_orig.shape) == 2:
-            raise ValueError("TotalSegmentator does not work for 2D images. Use a 3D image.")
+            raise ValueError("AutoAnatomy does not work for 2D images. Use a 3D image.")
         if len(img_in_orig.shape) > 3:
             print(f"WARNING: Input image has {len(img_in_orig.shape)} dimensions. Only using first three dimensions.")
             img_in_orig = nib.Nifti1Image(img_in_orig.get_fdata()[:,:,:,0], img_in_orig.affine)
@@ -622,7 +622,7 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                             print(f"Error during prediction for input: {file_in}, task: {task_name}, task_id: {tid}, part: {idx+1}/{len(task_id)}")
                         raise
                     # iterate over models (different sets of classes)
-                    # Map part-model labels to the final TotalSegmentator labels with a
+                    # Map part-model labels to the final output labels with a
                     # lookup table. This avoids per-label boolean masks and reduces
                     # runtime for "total" from about 3min to 2min 45s.
                     part_map = class_map_parts[map_taskid_to_partname[tid]]
@@ -716,7 +716,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
 
         preview_after_refinement = preview and output_task_name == "vertebrae_pp_refined" and vertebrae_body_mask is not None
         if preview and not preview_after_refinement:
-            from totalsegmentator.preview import generate_preview
+            # PNG preview generation was dropped in this fork (AutoAnatomy's TUI has
+            # its own real slice viewer instead) -- preview is never True here.
+            raise NotImplementedError("PNG preview generation is not available in this build.")
             # Generate preview before upsampling so it is faster and still in canonical space
             # for better orientation.
             if not quiet: print("Generating preview...")
@@ -846,7 +848,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
         img_out = add_label_map_to_nifti(img_out, label_map)
 
         if preview_after_refinement:
-            from totalsegmentator.preview import generate_preview
+            # PNG preview generation was dropped in this fork (AutoAnatomy's TUI has
+            # its own real slice viewer instead) -- preview is never True here.
+            raise NotImplementedError("PNG preview generation is not available in this build.")
             if not quiet: print("Generating preview...")
             if file_out is None:
                 print("WARNING: No output directory specified. Skipping preview generation.")

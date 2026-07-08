@@ -1,14 +1,13 @@
 # AutoAnatomy
 
 Craniofacial CT segmentation — mandible, teeth, skull, head, sinuses — with a
-terminal GUI. A focused fork of [TotalSegmentator](https://github.com/wasserth/TotalSegmentator),
-stripped down to a single task and rebuilt around it.
+terminal GUI, built around a real nnU-Net inference engine.
 
 > **Status: under construction.** The segmentation engine is real (real
 > downloaded nnU-Net weights, real GPU/CPU inference, real DICOM/NIfTI I/O).
-> The product surface around it — batch runs, DICOM-SEG/RT-STRUCT/STL export,
-> the other TotalSegmentator tasks — is scaffolded but not all wired up yet.
-> Those are marked `[Phase 2]` wherever they show up in the TUI.
+> The product surface around it — batch runs, 3D mesh export, additional
+> craniofacial tasks — is scaffolded but not all wired up yet. Those are
+> marked `[Phase 2]` wherever they show up in the TUI.
 
 ## What it segments today
 
@@ -48,8 +47,8 @@ high-resolution model runs.
 
 ## How it works
 
-1. **Rough crop.** A 6mm low-res pass of the upstream "total" model locates
-   the skull so the expensive 0.5mm model only has to run on a small ROI.
+1. **Rough crop.** A 6mm low-res pass locates the skull so the expensive
+   0.5mm model only has to run on a small ROI.
 2. **craniofacial_structures inference.** The real nnU-Net model
    (`nnUNetTrainer_DASegOrd0_NoMirroring`, task 115) segments the cropped
    region at 0.5mm.
@@ -63,14 +62,14 @@ pipeline.
 
 ```
 autoanatomy/
-  engine/   nnU-Net inference engine (stripped from TotalSegmentator)
+  engine/   nnU-Net segmentation engine
   cli/      headless CLI (`autoanatomy`)
   tui/      Textual terminal GUI (`autoanatomy-gui`)
 scripts/    environment setup
 tests/      pytest suite (class map correctness + real inference smoke test)
 ```
 
-## Attribution
+## License
 
-Derived from [TotalSegmentator](https://github.com/wasserth/TotalSegmentator)
-by Jakob Wasserthal and contributors, Apache 2.0. See [NOTICE](NOTICE).
+Apache 2.0. See [LICENSE](LICENSE) and [NOTICE](NOTICE) for third-party
+attribution.

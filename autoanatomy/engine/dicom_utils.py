@@ -103,7 +103,7 @@ def load_snomed_mapping():
     import csv
     from pathlib import Path
     
-    csv_path = Path(__file__).parent / "resources" / "totalsegmentator_snomed_mapping.csv"
+    csv_path = Path(__file__).parent / "resources" / "snomed_mapping.csv"
     
     snomed_map = {}
     with open(csv_path) as f:
@@ -145,12 +145,12 @@ def load_snomed_mapping():
 def load_color_mapping():
     """Load predefined RGB color mapping for structures from CSV.
     Returns dict mapping structure name to (R,G,B) tuple; empty if not found or invalid.
-    Reads from totalsegmentator_snomed_mapping.csv column 'DicomRGBColor'.
+    Reads from snomed_mapping.csv column 'DicomRGBColor'.
     """
     import csv
     from pathlib import Path
 
-    csv_path = Path(__file__).parent / "resources" / "totalsegmentator_snomed_mapping.csv"
+    csv_path = Path(__file__).parent / "resources" / "snomed_mapping.csv"
 
     color_map = {}
     with open(csv_path, newline="") as f:

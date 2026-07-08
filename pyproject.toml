@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autoanatomy"
 version = "0.1.0.dev0"
-description = "Craniofacial CT segmentation (mandible, teeth, skull, head, sinuses) — a focused fork of TotalSegmentator with a terminal GUI."
+description = "Craniofacial CT segmentation (mandible, teeth, skull, head, sinuses) with a terminal GUI."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }
@@ -26,8 +26,8 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Only needed for the not-yet-wired-up DICOM-SEG / RT-STRUCT export buttons
-# in the Results screen (shown as "Phase 2" placeholders in the TUI).
+# Only needed for DICOM-SEG / RT-STRUCT export, which isn't wired up in the
+# CLI/TUI yet (the underlying engine code path still exists).
 dicom-export = ["rt_utils", "highdicom"]
 dev = ["pytest"]
 

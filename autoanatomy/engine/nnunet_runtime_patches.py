@@ -545,7 +545,7 @@ def predict_from_files_sequential(self,
 
 def patch_nnunet_cropped_logits_resampling() -> bool:
     """
-    Add TotalSegmentator's cropped-logits export path to upstream nnU-Net at runtime.
+    Add AutoAnatomy's cropped-logits export path to upstream nnU-Net at runtime.
 
     Returns True when this function installed the patch. If the installed nnU-Net
     already provides the keyword natively, no patch is applied and False is returned.

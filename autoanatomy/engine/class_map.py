@@ -1,8 +1,8 @@
 class_map = {
 
-    # Kept from upstream TotalSegmentator "total" task: needed because the
-    # craniofacial_structures pipeline crops to the skull region first, using
-    # a rough low-res "total" segmentation (see engine/api.py crop step).
+    # Kept because the craniofacial_structures pipeline crops to the skull
+    # region first, using a rough low-res whole-scan segmentation (see
+    # engine/api.py crop step).
     "total": {
         1: "spleen",
         2: "kidney_right",

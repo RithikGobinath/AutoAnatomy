@@ -27,7 +27,7 @@ class AutoAnatomyApp(App):
     result_volumes_mm3: dict = {}
     result_voxel_counts: dict = {}
 
-    # Advanced settings -- all real, thread straight through to engine.api.totalsegmentator().
+    # Advanced settings -- all real, thread straight through to engine.api.segment().
     statistics: bool = False
     remove_small_blobs: bool = False
     robust_crop: bool = False

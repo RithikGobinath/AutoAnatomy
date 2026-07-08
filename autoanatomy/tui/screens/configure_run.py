@@ -41,7 +41,7 @@ class ConfigureRunScreen(Screen):
 
             yield Static(
                 "\n[dim]0.5mm isotropic resolution, fixed by the model. --fast is not "
-                "supported for this task (matches upstream TotalSegmentator).[/dim]"
+                "supported for this task (fixed model constraint).[/dim]"
             )
 
             with Collapsible(title="Advanced settings", collapsed=True):

@@ -2,10 +2,7 @@ import io
 import os
 import contextlib
 import sys
-import random
-import json
 import time
-import string
 import shutil
 import zipfile
 from pathlib import Path
@@ -15,8 +12,8 @@ import requests
 import numpy as np
 import nibabel as nib
 
-from autoanatomy.engine.class_map import class_map, class_map_5_parts, commercial_models
-from autoanatomy.engine.config import get_totalseg_dir, get_weights_dir, is_valid_license, has_valid_license, has_valid_license_offline, get_version
+from autoanatomy.engine.class_map import class_map, class_map_5_parts
+from autoanatomy.engine.config import get_weights_dir
 from autoanatomy.engine.nifti_ext_header import load_multilabel_nifti, add_label_map_to_nifti
 
 
@@ -63,60 +60,6 @@ def robust_rmtree(path, max_retries=3, delay=0.5):
             else:
                 # Last attempt failed, raise the error
                 raise OSError(f"Failed to remove {path} after {max_retries} attempts: {e}")
-
-
-def download_model_with_license_and_unpack(task_name, config_dir):
-    # Get License Number
-    totalseg_dir = get_totalseg_dir()
-    totalseg_config_file = totalseg_dir / "config.json"
-    if totalseg_config_file.exists():
-        with open(totalseg_config_file) as f:
-            config = json.load(f)
-        license_number = config["license_number"]
-    else:
-        print(f"ERROR: Could not find config file: {totalseg_config_file}")
-        return False
-
-    tempfile = config_dir / "tmp_download_file.zip"
-    url = "https://backend.totalsegmentator.com:443/"
-
-    # Download
-    try:
-        st = time.time()
-        r = requests.post(url + "download_weights",
-                          json={"license_number": license_number,
-                                "task": task_name,
-                                "version": get_version()},
-                          timeout=300,
-                          stream=True)
-        r.raise_for_status()  # Raise an exception for HTTP errors (4xx, 5xx)
-
-        if r.ok:
-            with open(tempfile, "wb") as f:
-                # without progress bar
-                # f.write(r.content)
-
-                total_size = int(r.headers.get('content-length', 0))
-                progress_bar = tqdm(total=total_size, unit='B', unit_scale=True, desc="Downloading")
-                for chunk in r.iter_content(chunk_size=8192 * 16):
-                    progress_bar.update(len(chunk))
-                    f.write(chunk)
-                progress_bar.close()
-
-            print("Download finished. Extracting...")
-            with zipfile.ZipFile(config_dir / "tmp_download_file.zip", 'r') as zip_f:
-                zip_f.extractall(config_dir)
-            # print(f"  downloaded in {time.time()-st:.2f}s")
-        else:
-            if r.json()['status'] == "invalid_license":
-                print(f"ERROR: Invalid license number ({license_number}). Please check your license number or contact support.")
-                sys.exit(1)
-
-    except Exception as e:
-        raise e
-    finally:
-        if tempfile.exists():
-            os.remove(tempfile)
 
 
 def download_url_and_unpack(url, config_dir):
@@ -166,34 +109,8 @@ def download_pretrained_weights(task_id):
     config_dir = get_weights_dir()
     config_dir.mkdir(exist_ok=True, parents=True)
 
-    old_weights = [
-        "nnUNet/3d_fullres/Task251_TotalSegmentator_part1_organs_1139subj",
-        "nnUNet/3d_fullres/Task252_TotalSegmentator_part2_vertebrae_1139subj",
-        "nnUNet/3d_fullres/Task253_TotalSegmentator_part3_cardiac_1139subj",
-        "nnUNet/3d_fullres/Task254_TotalSegmentator_part4_muscles_1139subj",
-        "nnUNet/3d_fullres/Task255_TotalSegmentator_part5_ribs_1139subj",
-        "nnUNet/3d_fullres/Task256_TotalSegmentator_3mm_1139subj",
-        "nnUNet/3d_fullres/Task258_lung_vessels_248subj",
-        "nnUNet/3d_fullres/Task200_covid_challenge",
-        "nnUNet/3d_fullres/Task201_covid",
-        "nnUNet/3d_fullres/Task150_icb_v0",
-        "nnUNet/3d_fullres/Task260_hip_implant_71subj",
-        "nnUNet/3d_fullres/Task269_Body_extrem_6mm_1200subj",
-        "nnUNet/3d_fullres/Task503_cardiac_motion",
-        "nnUNet/3d_fullres/Task273_Body_extrem_1259subj",
-        "nnUNet/3d_fullres/Task315_thoraxCT",
-        "nnUNet/3d_fullres/Task008_HepaticVessel",
-        "nnUNet/3d_fullres/Task417_heart_mixed_317subj",
-        "nnUNet/3d_fullres/Task278_TotalSegmentator_part6_bones_1259subj",
-        "nnUNet/3d_fullres/Task435_Heart_vessels_118subj",
-        # "Dataset297_TotalSegmentator_total_3mm_1559subj",  # for >= v2.0.4
-        "Dataset297_TotalSegmentator_total_3mm_1559subj_v204",  # for >= v2.0.5
-        # "Dataset298_TotalSegmentator_total_6mm_1559subj",  # for >= v2.0.5
-        "Dataset302_vertebrae_body_1559subj",
-        "body_stats_models_2026_02_11"
-    ]
-
-    # url = "http://backend.totalsegmentator.com"
+    # Model weights are hosted on the upstream project's GitHub releases --
+    # this is a real, required download URL, not a display name.
     url = "https://github.com/wasserth/TotalSegmentator/releases/download"
 
     if task_id == 297:
@@ -211,33 +128,10 @@ def download_pretrained_weights(task_id):
         raise ValueError(f"For task_id {task_id} no download path was found.")
 
 
-    for old_weight in old_weights:
-        if (config_dir / old_weight).exists():
-            robust_rmtree(config_dir / old_weight)
-
     if not weights_path.exists():
-
         print(f"Downloading model for Task {task_id} ...")
-
-        commercial_models_inv = {v: k for k, v in commercial_models.items()}
-        if task_id in commercial_models_inv:
-            download_task_name = "vertebrae_pp" if task_id == 803 else commercial_models_inv[task_id]
-            download_model_with_license_and_unpack(download_task_name, config_dir)
-        else:
-            # r = requests.get(WEIGHTS_URL)
-            # with zipfile.ZipFile(io.BytesIO(r.content)) as zip_f:
-            #     zip_f.extractall(config_dir)
-            #     print(f"Saving to: {config_dir}")
-
-            # download_url(WEIGHTS_URL, config_dir / "tmp_download_file.zip")
-            # with zipfile.ZipFile(config_dir / "tmp_download_file.zip", 'r') as zip_f:
-            #     zip_f.extractall(config_dir)
-            #     print(config_dir)
-            # delete tmp file
-            # (config_dir / "tmp_download_file.zip").unlink()
-
-            weights_path.parent.mkdir(exist_ok=True, parents=True)
-            download_url_and_unpack(WEIGHTS_URL, weights_path.parent)
+        weights_path.parent.mkdir(exist_ok=True, parents=True)
+        download_url_and_unpack(WEIGHTS_URL, weights_path.parent)
 
 
 def combine_masks_to_multilabel_file(masks_dir, multilabel_file):
@@ -310,7 +204,7 @@ def combine_masks(mask_dir, class_type, multilabel=False):
             if (mask_dir / f"{mask}.nii.gz").exists():
                 ref_img = nib.load(mask_dir / f"{masks[0]}.nii.gz")
             else:
-                raise ValueError(f"Could not find {mask_dir / mask}.nii.gz. Did you run TotalSegmentator successfully?")
+                raise ValueError(f"Could not find {mask_dir / mask}.nii.gz. Did the segmentation run successfully?")
 
         combined = np.zeros(ref_img.shape, dtype=np.uint8)
         for idx, mask in enumerate(masks):

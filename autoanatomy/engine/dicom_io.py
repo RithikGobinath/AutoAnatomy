@@ -403,8 +403,8 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
     else:
         xp = np
     
-    # Get TotalSegmentator version
-    version = importlib.metadata.version("TotalSegmentator")
+    # Get AutoAnatomy version
+    version = importlib.metadata.version("autoanatomy")
     
     # Load SNOMED CT codes mapping
     snomed_map = load_snomed_mapping()
@@ -452,7 +452,7 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
     # Validate and fix SOPClassUID if missing or empty
     for img in source_images:
         if not hasattr(img, 'SOPClassUID') or img.SOPClassUID == '':
-            # Set to CT Image Storage by default (most common for TotalSegmentator)
+            # Set to CT Image Storage by default (most common input for AutoAnatomy)
             # If it's an MR image, we could check Modality tag to determine the correct UID
             if hasattr(img, 'Modality'):
                 if img.Modality == 'CT':
@@ -535,7 +535,7 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
                 segmented_property_type=property_type,
                 algorithm_type=hd.seg.SegmentAlgorithmTypeValues.AUTOMATIC,
                 algorithm_identification=hd.AlgorithmIdentificationSequence(
-                    name="TotalSegmentator",
+                    name="AutoAnatomy",
                     version=version,
                     family=codes.DCM.ArtificialIntelligence
                 )
@@ -549,7 +549,7 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
                 segmented_property_type=codes.SCT.Tissue,
                 algorithm_type=hd.seg.SegmentAlgorithmTypeValues.AUTOMATIC,
                 algorithm_identification=hd.AlgorithmIdentificationSequence(
-                    name="TotalSegmentator",
+                    name="AutoAnatomy",
                     version=version,
                     family=codes.DCM.ArtificialIntelligence
                 )
@@ -592,8 +592,8 @@ def save_mask_as_dicomseg(img_data, selected_classes, dcm_reference_file, output
         series_number=100,
         sop_instance_uid=hd.UID(),
         instance_number=1,
-        manufacturer="TotalSegmentator",
-        manufacturer_model_name="TotalSegmentator",
+        manufacturer="AutoAnatomy",
+        manufacturer_model_name="AutoAnatomy",
         software_versions=version,
         device_serial_number="1"
     )

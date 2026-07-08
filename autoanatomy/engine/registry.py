@@ -1,15 +1,15 @@
 """
-Machine-readable registry of TotalSegmentator's segmentation tasks.
+Machine-readable registry of AutoAnatomy's segmentation tasks.
 
 This module is the single source of truth for which segmentation tasks exist,
 which anatomical classes each one outputs, whether it requires a license and
 whether it operates on CT or MR images.
 
-It intentionally only depends on the pure-data maps in ``map_to_binary`` (no
+It intentionally only depends on the pure-data maps in ``class_map`` (no
 torch, no model weights), so it can be imported and queried instantly. This
-powers the ``totalseg_info`` command and the ``--list-tasks`` / ``--list-classes``
-flags of the main CLI, letting humans and automation discover the tool's
-capabilities without reading the source code.
+powers the ``list-structures`` and ``check`` subcommands of the main CLI,
+letting humans and automation discover the tool's capabilities without
+reading the source code.
 """
 import importlib.metadata
 
@@ -25,8 +25,8 @@ TASKS = [
     "craniofacial_structures",
 ]
 
-# Other upstream TotalSegmentator tasks planned for later phases. Not yet
-# selectable -- surfaced in the TUI's roadmap panel as "coming soon".
+# Other segmentation tasks planned for later phases. Not yet selectable --
+# surfaced in the TUI's roadmap panel as "coming soon".
 ROADMAP_TASKS = [
     "teeth", "head_glands_cavities", "head_muscles", "headneck_bones_vessels",
 ]
@@ -82,7 +82,7 @@ def list_tasks():
 def task_registry():
     """Full machine-readable capability map for all selectable tasks (JSON-serializable)."""
     return {
-        "totalsegmentator_version": package_version(),
+        "autoanatomy_version": package_version(),
         "tasks": {
             t: {
                 "modality": task_modality(t),
@@ -95,7 +95,7 @@ def task_registry():
 
 
 def format_tasks_table():
-    """Human-readable table of all tasks (used by totalseg_info and --list-tasks)."""
+    """Human-readable table of all selectable tasks."""
     rows = list_tasks()
     name_w = max(len("TASK"), max(len(r["name"]) for r in rows))
     header = f"{'TASK'.ljust(name_w)}  MODALITY  LICENSE  CLASSES"
@@ -104,8 +104,7 @@ def format_tasks_table():
         lic = "yes" if r["license_required"] else "no"
         lines.append(f"{r['name'].ljust(name_w)}  {r['modality'].ljust(8)}  {lic.ljust(7)}  {r['num_classes']}")
     lines.append("")
-    lines.append(f"{len(rows)} tasks. Licensed tasks need a (free for non-commercial) license: "
-                 "https://backend.totalsegmentator.com/license-academic/")
+    lines.append(f"{len(rows)} task(s). None require a license in this build.")
     return "\n".join(lines)
 
 

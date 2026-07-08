@@ -4,7 +4,6 @@ import json
 import importlib.metadata
 from pathlib import Path
 import time
-import textwrap
 from typing import Union
 import tempfile
 
@@ -15,8 +14,6 @@ import torch
 from autoanatomy.engine.statistics import get_basic_statistics, get_radiomics_features_for_entire_dir
 from autoanatomy.engine.weights import download_pretrained_weights
 from autoanatomy.engine.config import setup_nnunet, setup_totalseg, increase_prediction_counter
-from autoanatomy.engine.config import send_usage_stats, set_license_number, has_valid_license_offline
-from autoanatomy.engine.config import get_config_key, set_config_key
 from autoanatomy.engine.class_map import class_map
 import re
 
@@ -106,7 +103,7 @@ def build_run_report(input, output, task, device, fast, fastest, ml, output_type
         output_files = sorted(p.name for p in Path(output).glob("*.nii.gz"))
 
     return {
-        "totalsegmentator_version": package_version(),
+        "autoanatomy_version": package_version(),
         "nnunetv2_version": nnunet_version,
         "torch_version": torch.__version__,
         "task": task,
@@ -128,32 +125,13 @@ def build_run_report(input, output, task, device, fast, fastest, ml, output_type
     }
 
 
-def show_license_info():
-    status, message = has_valid_license_offline()
-    if status == "missing_license":
-        # textwarp needed to remove the indentation of the multiline string
-        print(textwrap.dedent("""\
-              In contrast to the other tasks this task is not openly available.
-              It requires a license. For non-commercial usage a free license can be
-              acquired here:
-              https://backend.totalsegmentator.com/license-academic/
-
-              For commercial usage contact: jakob.wasserthal@usb.ch
-              """))
-        sys.exit(1)
-    elif status == "invalid_license":
-        print(message)
-        sys.exit(1)
-    elif status == "missing_config_file":
-        print(message)
-        sys.exit(1)
 
 
-def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]=None, ml=False, nr_thr_resamp=1, nr_thr_saving=6,
+def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]=None, ml=False, nr_thr_resamp=1, nr_thr_saving=6,
                      fast=False, nora_tag="None", preview=False, task="total", roi_subset=None,
                      statistics: Union[bool, str, Path]=False, radiomics=False, crop_path=None, body_seg=False,
                      force_split=False, output_type="nifti", quiet=False, verbose=False, test=0,
-                     skip_saving=False, device="gpu", license_number=None,
+                     skip_saving=False, device="gpu",
                      statistics_exclude_masks_at_border=True, no_derived_masks=False,
                      v1_order=False, fastest=False, roi_subset_robust=None, stats_aggregation="mean",
                      remove_small_blobs=False, statistics_normalized_intensities=False,
@@ -162,10 +140,9 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
                      debug=False, report=None, statistics_extra=False, save_lowres=False, resampling_order=3,
                      plans="nnUNetPlans", model_size="big"):
     """
-    Run TotalSegmentator from within python.
+    Run AutoAnatomy's segmentation pipeline from within python.
 
-    For explanation of the arguments see description of command line
-    arguments in bin/TotalSegmentator.
+    For explanation of the arguments see autoanatomy/cli/main.py.
 
     Return: multilabel Nifti1Image
     """
@@ -213,17 +190,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
     if model_size == "small" and task != "total_v3":
         raise ValueError("model_size='small' is currently only supported for task 'total_v3'.")
 
-    if not quiet:
-        print("\nIf you use this tool please cite: https://pubs.rsna.org/doi/10.1148/ryai.230024\n")
-
     setup_nnunet()
     setup_totalseg()
-    if license_number is not None:
-        set_license_number(license_number)
-
-    if not get_config_key("statistics_disclaimer_shown"):  # Evaluates to True is variable not set (None) or set to False
-        print("TotalSegmentator sends anonymous usage statistics. If you want to disable it check the documentation.")
-        set_config_key("statistics_disclaimer_shown", True)
 
     from autoanatomy.engine.nnunet_runner import nnUNet_predict_image  # this has to be after setting new env vars
 
@@ -350,8 +318,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
             class_map_inv = {v: k for k, v in class_map[crop_task].items()}
             
         else:
-            # If crop_model is specified, run totalsegmentator for the crop model
-            organ_seg = totalsegmentator(input, None, task=crop_model, nr_thr_resamp=nr_thr_resamp, 
+            # If crop_model is specified, run segment() again for the crop model
+            organ_seg = segment(input, None, task=crop_model, nr_thr_resamp=nr_thr_resamp,
                                          device=convert_device_to_string(device), quiet=quiet, verbose=verbose,
                                          resampling_order=resampling_order)
             class_map_inv = {v: k for k, v in class_map[crop_model].items()}
@@ -427,13 +395,8 @@ def totalsegmentator(input: Union[str, Path, Nifti1Image], output: Union[str, Pa
 
     try:
         # this can result in error if running multiple processes in parallel because all try to write the same file.
-        # Trying to fix with lock from portalocker did not work. Network drive seems to not support this locking.
-        config = increase_prediction_counter()
-        send_usage_stats(config, {"task": task, "fast": fast, "preview": preview,
-                                "multilabel": ml, "roi_subset": roi_subset,
-                                "statistics": statistics, "radiomics": radiomics})
-    except Exception as e:
-        # print(f"Error while sending usage stats: {e}")
+        increase_prediction_counter()
+    except Exception:
         pass
 
     if statistics:

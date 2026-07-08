@@ -74,7 +74,7 @@ class RunProgressScreen(Screen):
 
     @work(thread=True)
     def run_segmentation(self) -> None:
-        from autoanatomy.engine.api import totalsegmentator
+        from autoanatomy.engine.api import segment
 
         app = self.app
 
@@ -92,7 +92,7 @@ class RunProgressScreen(Screen):
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
             with _redirect_stdout(stream):
-                totalsegmentator(
+                segment(
                     input=app.scan_path,
                     output=app.output_dir,
                     task="craniofacial_structures",

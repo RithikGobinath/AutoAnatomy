@@ -22,7 +22,7 @@ def resampling_order(value):
 def cmd_segment(args):
     # Imported lazily: this pulls in torch/nnunetv2, which is slow and
     # unnecessary for --list-structures / check / download-weights.
-    from autoanatomy.engine.api import totalsegmentator, validate_device_type_api
+    from autoanatomy.engine.api import segment, validate_device_type_api
 
     try:
         validate_device_type_api(args.device)
@@ -41,7 +41,7 @@ def cmd_segment(args):
         )
         return 1
 
-    totalsegmentator(
+    segment(
         input=Path(args.input),
         output=output,
         task=args.task,
@@ -120,9 +120,7 @@ def build_parser():
     p_seg = sub.add_parser(
         "segment",
         help="Run craniofacial segmentation on a CT scan",
-        description="Argument names match upstream TotalSegmentator's CLI (-i/-o/-ta) so existing "
-                     "commands drop in unchanged, e.g.: "
-                     "autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures",
+        description="Example: autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures",
     )
     p_seg.add_argument("-i", "--input", required=True, help="CT NIfTI file or DICOM folder")
     p_seg.add_argument("-o", "--output", required=True, help="Output directory (or file path if --ml)")
