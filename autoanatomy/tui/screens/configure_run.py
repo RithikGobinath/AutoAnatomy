@@ -3,7 +3,7 @@ from pathlib import Path
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, Input, RadioButton, RadioSet, Static
+from textual.widgets import Button, Checkbox, Footer, Header, Input, RadioButton, RadioSet, Static
 
 from autoanatomy.engine.class_map import class_map
 
@@ -26,7 +26,9 @@ class ConfigureRunScreen(Screen):
                 yield RadioButton("gpu (recommended if available)", value=True, id="dev-gpu")
                 yield RadioButton("cpu", id="dev-cpu")
 
-            yield Static("\nOutput directory:")
+            yield Checkbox("Save as a single multilabel NIfTI file (--ml)", id="ml-checkbox")
+
+            yield Static("\nOutput (directory, or a .nii.gz file path if --ml is checked):", id="output-label")
             default_out = str(Path.home() / "AutoAnatomy_output")
             yield Input(value=default_out, id="output-input")
 
@@ -46,10 +48,21 @@ class ConfigureRunScreen(Screen):
         elif event.button.id == "run-btn":
             self._start_run()
 
+    def on_checkbox_changed(self, event: Checkbox.Changed) -> None:
+        if event.checkbox.id != "ml-checkbox":
+            return
+        out_input = self.query_one("#output-input", Input)
+        if event.value and not out_input.value.endswith((".nii", ".nii.gz")):
+            out_input.value = str(Path.home() / "AutoAnatomy_output" / "output.nii.gz")
+        elif not event.value and out_input.value.endswith((".nii", ".nii.gz")):
+            out_input.value = str(Path.home() / "AutoAnatomy_output")
+
     def _start_run(self) -> None:
         device_set = self.query_one("#device-set", RadioSet)
         pressed = device_set.pressed_button
         self.app.device = "cpu" if pressed and pressed.id == "dev-cpu" else "gpu"
+
+        self.app.ml = self.query_one("#ml-checkbox", Checkbox).value
 
         out_raw = self.query_one("#output-input", Input).value.strip().strip('"')
         self.app.output_dir = Path(out_raw) if out_raw else Path.home() / "AutoAnatomy_output"

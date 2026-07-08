@@ -84,7 +84,7 @@ class RunProgressScreen(Screen):
                     input=app.scan_path,
                     output=app.output_dir,
                     task="craniofacial_structures",
-                    ml=False,
+                    ml=app.ml,
                     device=app.device,
                     statistics=True,
                     quiet=False,
@@ -107,16 +107,28 @@ class RunProgressScreen(Screen):
         voxel_counts = {}
         volumes_mm3 = {}
 
-        for label_id, name in cmap.items():
-            mask_path = app.output_dir / f"{name}.nii.gz"
-            if not mask_path.exists():
-                continue
-            img = nib.load(str(mask_path))
+        if app.ml:
+            # Single multilabel file: app.output_dir is the file path itself.
+            if not app.output_dir.exists():
+                return
+            img = nib.load(str(app.output_dir))
             data = np.asanyarray(img.dataobj)
             voxel_vol = float(np.prod(img.header.get_zooms()))
-            voxels = int(data.sum())
-            voxel_counts[name] = voxels
-            volumes_mm3[name] = voxels * voxel_vol
+            for label_id, name in cmap.items():
+                voxels = int((data == label_id).sum())
+                voxel_counts[name] = voxels
+                volumes_mm3[name] = voxels * voxel_vol
+        else:
+            for label_id, name in cmap.items():
+                mask_path = app.output_dir / f"{name}.nii.gz"
+                if not mask_path.exists():
+                    continue
+                img = nib.load(str(mask_path))
+                data = np.asanyarray(img.dataobj)
+                voxel_vol = float(np.prod(img.header.get_zooms()))
+                voxels = int(data.sum())
+                voxel_counts[name] = voxels
+                volumes_mm3[name] = voxels * voxel_vol
 
         app.result_voxel_counts = voxel_counts
         app.result_volumes_mm3 = volumes_mm3

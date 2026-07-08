@@ -57,13 +57,20 @@ class ResultsScreen(Screen):
             volume = np.asanyarray(img.dataobj)
 
             combined_mask = np.zeros(volume.shape, dtype=np.uint8)
-            for label_id, name in class_map["craniofacial_structures"].items():
-                mask_path = self.app.output_dir / f"{name}.nii.gz"
-                if mask_path.exists():
-                    m = nib.load(str(mask_path))
+            if self.app.ml:
+                if self.app.output_dir.exists():
+                    m = nib.load(str(self.app.output_dir))
                     data = np.asanyarray(m.dataobj)
                     if data.shape == volume.shape:
-                        combined_mask[data > 0] = label_id
+                        combined_mask = data.astype(np.uint8)
+            else:
+                for label_id, name in class_map["craniofacial_structures"].items():
+                    mask_path = self.app.output_dir / f"{name}.nii.gz"
+                    if mask_path.exists():
+                        m = nib.load(str(mask_path))
+                        data = np.asanyarray(m.dataobj)
+                        if data.shape == volume.shape:
+                            combined_mask[data > 0] = label_id
 
             self.query_one("#slice-viewer", SliceViewer).set_volume(volume, combined_mask)
         except Exception:

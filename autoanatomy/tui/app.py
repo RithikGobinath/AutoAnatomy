@@ -22,8 +22,8 @@ class AutoAnatomyApp(App):
     # Shared run state, read/written by screens as the user moves through the flow.
     scan_path: Path | None = None
     device: str = "gpu"
+    ml: bool = False
     output_dir: Path | None = None
-    result_multilabel_path: Path | None = None
     result_volumes_mm3: dict = {}
     result_voxel_counts: dict = {}
 
