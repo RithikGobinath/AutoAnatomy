@@ -1,6 +1,7 @@
 import io
 import shutil
 import sys
+import threading
 import traceback
 from contextlib import contextmanager
 
@@ -20,13 +21,24 @@ MIN_FREE_DISK_GB = 5
 
 
 class _StreamToLog(io.TextIOBase):
-    """Redirects the engine's real print() progress output into the RichLog widget."""
+    """Redirects the engine's real print() progress output into the RichLog widget.
 
-    def __init__(self, screen: "RunProgressScreen"):
+    sys.stdout is process-global, not thread-local, so redirecting it for the
+    worker thread also affects the main thread for as long as the redirect is
+    active. If anything on the main thread prints during that window, route it
+    straight to the real stdout instead of call_from_thread -- that call is
+    only valid when invoked from a thread other than the app's own.
+    """
+
+    def __init__(self, screen: "RunProgressScreen", worker_thread: threading.Thread, real_stdout):
         self.screen = screen
+        self.worker_thread = worker_thread
+        self.real_stdout = real_stdout
         self._buf = ""
 
     def write(self, text: str) -> int:
+        if threading.current_thread() is not self.worker_thread:
+            return self.real_stdout.write(text)
         self._buf += text
         while "\n" in self._buf:
             line, self._buf = self._buf.split("\n", 1)
@@ -77,7 +89,7 @@ class RunProgressScreen(Screen):
             )
             return
 
-        stream = _StreamToLog(self)
+        stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
             with _redirect_stdout(stream):
                 totalsegmentator(
@@ -86,10 +98,19 @@ class RunProgressScreen(Screen):
                     task="craniofacial_structures",
                     ml=app.ml,
                     device=app.device,
-                    statistics=True,
                     quiet=False,
                     verbose=True,
+                    statistics=app.statistics,
+                    remove_small_blobs=app.remove_small_blobs,
+                    robust_crop=app.robust_crop,
+                    nr_thr_resamp=app.nr_thr_resamp,
+                    nr_thr_saving=app.nr_thr_saving,
+                    resampling_order=app.resampling_order,
                 )
+            if app.statistics:
+                stats_dir = app.output_dir.parent if app.ml else app.output_dir
+                stats_path = stats_dir / "statistics.json"
+                app.statistics_path = stats_path if stats_path.exists() else None
             self._collect_results()
             app.call_from_thread(self._on_success)
         except Exception:

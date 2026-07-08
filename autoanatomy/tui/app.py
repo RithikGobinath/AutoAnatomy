@@ -27,6 +27,15 @@ class AutoAnatomyApp(App):
     result_volumes_mm3: dict = {}
     result_voxel_counts: dict = {}
 
+    # Advanced settings -- all real, thread straight through to engine.api.totalsegmentator().
+    statistics: bool = False
+    remove_small_blobs: bool = False
+    robust_crop: bool = False
+    nr_thr_resamp: int = 1
+    nr_thr_saving: int = 6
+    resampling_order: int = 3
+    statistics_path: Path | None = None
+
     def on_mount(self) -> None:
         from autoanatomy.tui.screens.splash import SplashScreen
         self.push_screen(SplashScreen())

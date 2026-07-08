@@ -21,11 +21,11 @@ class ResultsScreen(Screen):
             with VerticalScroll(classes="panel scroll-wrapper"):
                 yield Static("Results", classes="section-title")
                 yield StructureTable(id="structure-table")
+                if self.app.statistics_path is not None:
+                    yield Static(f"\n[dim]Full stats: {self.app.statistics_path}[/dim]")
                 yield Static("\nExport:", classes="section-title")
                 with Vertical():
                     yield Button("Save NIfTI masks (done)", id="export-nifti", disabled=True)
-                    yield Button("DICOM-SEG  [Phase 2]", id="export-dicomseg", disabled=True, variant="warning")
-                    yield Button("RT-STRUCT  [Phase 2]", id="export-rtstruct", disabled=True, variant="warning")
                     yield Button("3D mesh (STL)  [Phase 2]", id="export-stl", disabled=True, variant="warning")
                 yield Button("Back to Home", id="home-btn")
             with Vertical(classes="panel"):

@@ -63,3 +63,16 @@ Screen {
     color: $text-muted;
     text-style: italic;
 }
+
+.advanced-row {
+    height: 3;
+    align: left middle;
+}
+
+.advanced-row Static {
+    width: 24;
+}
+
+.advanced-row Input {
+    width: 12;
+}

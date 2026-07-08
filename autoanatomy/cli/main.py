@@ -12,6 +12,13 @@ from autoanatomy.engine.registry import TASKS, ROADMAP_TASKS, format_classes_tab
 MIN_FREE_DISK_GB = 5
 
 
+def resampling_order(value):
+    ivalue = int(value)
+    if not 0 <= ivalue <= 5:
+        raise argparse.ArgumentTypeError("resampling order must be between 0 and 5")
+    return ivalue
+
+
 def cmd_segment(args):
     # Imported lazily: this pulls in torch/nnunetv2, which is slow and
     # unnecessary for --list-structures / check / download-weights.
@@ -42,6 +49,12 @@ def cmd_segment(args):
         device=args.device,
         quiet=args.quiet,
         verbose=args.verbose,
+        statistics=args.statistics,
+        remove_small_blobs=args.remove_small_blobs,
+        robust_crop=args.robust_crop,
+        nr_thr_resamp=args.resample_threads,
+        nr_thr_saving=args.saving_threads,
+        resampling_order=args.resampling_order,
     )
     return 0
 
@@ -119,6 +132,20 @@ def build_parser():
     p_seg.add_argument("--device", default="gpu", help="gpu | cpu | mps | gpu:X (default: gpu)")
     p_seg.add_argument("-q", "--quiet", action="store_true")
     p_seg.add_argument("-v", "--verbose", action="store_true")
+
+    p_seg.add_argument("--statistics", action="store_true",
+                        help="Compute per-structure volume/intensity stats and write statistics.json next to the output")
+    p_seg.add_argument("--remove-small-blobs", nargs="?", const=200.0, default=False, type=float, metavar="MM3",
+                        help="Postprocessing cleanup: drop disconnected blobs smaller than MM3 (default 200mm^3 if given with no value)")
+    p_seg.add_argument("--robust-crop", action="store_true",
+                        help="Use the slower 3mm model (instead of the default 6mm) to locate the skull before "
+                             "running the high-res model -- more robust on unusual scans, at the cost of speed")
+    p_seg.add_argument("--resample-threads", type=int, default=1, metavar="N",
+                        help="Threads used for image resampling (default: 1)")
+    p_seg.add_argument("--saving-threads", type=int, default=6, metavar="N",
+                        help="Threads used for writing output files (default: 6)")
+    p_seg.add_argument("--resampling-order", type=resampling_order, default=3, metavar="0-5",
+                        help="Interpolation order for resampling -- higher is smoother but slower (default: 3)")
     p_seg.set_defaults(func=cmd_segment)
 
     p_list = sub.add_parser("list-structures", help="List the structures this build can segment")
