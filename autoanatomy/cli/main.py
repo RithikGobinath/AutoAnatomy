@@ -37,7 +37,7 @@ def cmd_segment(args):
     totalsegmentator(
         input=Path(args.input),
         output=output,
-        task="craniofacial_structures",
+        task=args.task,
         ml=args.ml,
         device=args.device,
         quiet=args.quiet,
@@ -104,9 +104,17 @@ def build_parser():
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    p_seg = sub.add_parser("segment", help="Run craniofacial segmentation on a CT scan")
+    p_seg = sub.add_parser(
+        "segment",
+        help="Run craniofacial segmentation on a CT scan",
+        description="Argument names match upstream TotalSegmentator's CLI (-i/-o/-ta) so existing "
+                     "commands drop in unchanged, e.g.: "
+                     "autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures",
+    )
     p_seg.add_argument("-i", "--input", required=True, help="CT NIfTI file or DICOM folder")
     p_seg.add_argument("-o", "--output", required=True, help="Output directory (or file path if --ml)")
+    p_seg.add_argument("-ta", "--task", default="craniofacial_structures", choices=TASKS,
+                        help="Segmentation task (default: craniofacial_structures -- the only task this build supports)")
     p_seg.add_argument("--ml", action="store_true", help="Write a single multilabel NIfTI instead of one file per structure")
     p_seg.add_argument("--device", default="gpu", help="gpu | cpu | mps | gpu:X (default: gpu)")
     p_seg.add_argument("-q", "--quiet", action="store_true")
