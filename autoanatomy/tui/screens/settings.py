@@ -1,5 +1,5 @@
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
@@ -11,7 +11,7 @@ class SettingsScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(classes="panel"):
+        with VerticalScroll(classes="panel scroll-wrapper"):
             yield Static("Settings", classes="section-title")
             yield SystemStatus()
 

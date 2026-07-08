@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Input, Static
 
@@ -11,7 +11,7 @@ class LoadScanScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(classes="panel"):
+        with VerticalScroll(classes="panel scroll-wrapper"):
             yield Static("Load a CT scan", classes="section-title")
             yield Static(
                 "Enter the path to a CT NIfTI file (.nii / .nii.gz) or a folder of DICOM slices.",

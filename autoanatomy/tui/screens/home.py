@@ -1,5 +1,5 @@
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
@@ -16,22 +16,23 @@ class HomeScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(classes="panel"):
-            yield Static("AutoAnatomy", classes="title-banner")
-            yield Static("What do you want to do?", classes="section-title")
-            with Horizontal(id="home-actions"):
-                yield Button("New Segmentation  (n)", id="new-run", variant="primary")
-                yield Button("Settings", id="settings")
-                yield Button("Quit", id="quit", variant="error")
+        with VerticalScroll(classes="scroll-wrapper"):
+            with Vertical(classes="panel"):
+                yield Static("AutoAnatomy", classes="title-banner")
+                yield Static("What do you want to do?", classes="section-title")
+                with Horizontal(id="home-actions"):
+                    yield Button("New Segmentation  (n)", id="new-run", variant="primary")
+                    yield Button("Settings", id="settings")
+                    yield Button("Quit", id="quit", variant="error")
 
-        with Vertical(classes="panel"):
-            yield Static("Roadmap — other TotalSegmentator tasks (coming soon)", classes="section-title")
-            with Horizontal():
-                for name, desc in ROADMAP:
-                    with Vertical(classes="roadmap-card"):
-                        yield Static(name, classes="roadmap-card-title")
-                        yield Static(desc)
-                        yield Static("[Phase 2]", classes="phase2-badge")
+            with Vertical(classes="panel"):
+                yield Static("Roadmap — other TotalSegmentator tasks (coming soon)", classes="section-title")
+                with Horizontal():
+                    for name, desc in ROADMAP:
+                        with Vertical(classes="roadmap-card"):
+                            yield Static(name, classes="roadmap-card-title")
+                            yield Static(desc)
+                            yield Static("[Phase 2]", classes="phase2-badge")
         yield Footer()
 
     def on_button_pressed(self, event: Button.Pressed) -> None:

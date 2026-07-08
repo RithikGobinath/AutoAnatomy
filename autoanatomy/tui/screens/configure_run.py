@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from textual.app import ComposeResult
-from textual.containers import Vertical
+from textual.containers import Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Checkbox, Footer, Header, Input, RadioButton, RadioSet, Static
 
@@ -13,7 +13,7 @@ class ConfigureRunScreen(Screen):
 
     def compose(self) -> ComposeResult:
         yield Header()
-        with Vertical(classes="panel"):
+        with VerticalScroll(classes="panel scroll-wrapper"):
             yield Static("Configure segmentation", classes="section-title")
             yield Static(f"Scan: [b]{self.app.scan_path}[/b]")
 

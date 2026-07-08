@@ -23,6 +23,14 @@ Screen {
     margin: 1;
 }
 
+/* Screens whose content can be taller than the terminal (forms, dashboards,
+   multi-panel layouts) apply this to a VerticalScroll wrapper so the content
+   scrolls instead of pushing buttons off-screen with no way to reach them. */
+.scroll-wrapper {
+    height: 1fr;
+    overflow-y: auto;
+}
+
 .roadmap-card {
     border: round $primary-darken-2;
     color: $text-muted;

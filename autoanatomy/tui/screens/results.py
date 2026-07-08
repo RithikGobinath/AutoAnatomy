@@ -1,5 +1,5 @@
 from textual.app import ComposeResult
-from textual.containers import Horizontal, Vertical
+from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.screen import Screen
 from textual.widgets import Button, Footer, Header, Static
 
@@ -18,7 +18,7 @@ class ResultsScreen(Screen):
     def compose(self) -> ComposeResult:
         yield Header()
         with Horizontal():
-            with Vertical(classes="panel"):
+            with VerticalScroll(classes="panel scroll-wrapper"):
                 yield Static("Results", classes="section-title")
                 yield StructureTable(id="structure-table")
                 yield Static("\nExport:", classes="section-title")
