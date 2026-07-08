@@ -1,0 +1,12 @@
+AutoAnatomy
+Copyright 2026 Rithik Gobinath
+
+This product is a derivative work of TotalSegmentator
+(https://github.com/wasserth/TotalSegmentator), created by Jakob Wasserthal
+and the TotalSegmentator contributors, licensed under the Apache License 2.0.
+
+AutoAnatomy strips TotalSegmentator down to its craniofacial_structures task
+(mandible, teeth, skull, head, sinuses) and adds a new Textual-based terminal
+GUI and headless CLI on top of the retained nnU-Net inference engine.
+
+See LICENSE for the full Apache 2.0 license text.

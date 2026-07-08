@@ -1,0 +1,57 @@
+Screen {
+    background: $surface;
+}
+
+.title-banner {
+    text-style: bold;
+    color: $accent;
+    content-align: center middle;
+    height: auto;
+    padding: 1 0;
+}
+
+.subtitle {
+    color: $text-muted;
+    content-align: center middle;
+    height: auto;
+    padding-bottom: 1;
+}
+
+.panel {
+    border: round $primary;
+    padding: 1 2;
+    margin: 1;
+}
+
+.roadmap-card {
+    border: round $primary-darken-2;
+    color: $text-muted;
+    padding: 0 1;
+    margin: 0 1 1 0;
+    width: 1fr;
+}
+
+.roadmap-card-title {
+    text-style: bold;
+}
+
+.phase2-badge {
+    color: $warning;
+    text-style: bold italic;
+}
+
+.section-title {
+    text-style: bold underline;
+    padding-bottom: 1;
+}
+
+#home-actions {
+    height: auto;
+    align: center middle;
+    padding: 1 0;
+}
+
+.hint {
+    color: $text-muted;
+    text-style: italic;
+}
