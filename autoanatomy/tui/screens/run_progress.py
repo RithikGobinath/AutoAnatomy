@@ -50,16 +50,28 @@ class _StreamToLog(io.TextIOBase):
         pass
 
 
+def _ml_output_path(output_dir, task: str, multi_task: bool):
+    """A single task keeps the exact literal path the user gave (zero behavior
+    change for existing single-task scripts). With more than one task selected,
+    suffix the filename per task so the second task's --ml run can't silently
+    overwrite the first's multilabel file."""
+    if not multi_task:
+        return output_dir
+    return output_dir.with_name(f"{output_dir.stem.removesuffix('.nii')}_{task}.nii.gz")
+
+
 class RunProgressScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back (does not cancel run)")]
 
     def compose(self) -> ComposeResult:
+        tasks = list(self.app.selected_tasks)
+        title = " + ".join(tasks)
         yield Header()
         with Vertical(classes="panel"):
-            yield Static("Running craniofacial segmentation...", classes="section-title", id="status-title")
+            yield Static(f"Running {title} segmentation...", classes="section-title", id="status-title")
             yield Static(
-                "First run downloads real model weights (craniofacial_structures + the "
-                "skull-cropping model) — this can take a while.",
+                "First run downloads real model weights for each selected task plus the "
+                "skull-cropping model — this can take a while.",
                 classes="hint",
             )
             yield RichLog(id="progress-log", wrap=True, highlight=False)
@@ -77,6 +89,8 @@ class RunProgressScreen(Screen):
         from autoanatomy.engine.api import segment
 
         app = self.app
+        tasks = list(app.selected_tasks)
+        multi_task = len(tasks) > 1
 
         _, _, free_bytes = shutil.disk_usage(str(app.output_dir.anchor or "/"))
         free_gb = free_bytes / 1e9
@@ -92,22 +106,30 @@ class RunProgressScreen(Screen):
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
             with _redirect_stdout(stream):
-                segment(
-                    input=app.scan_path,
-                    output=app.output_dir,
-                    task="craniofacial_structures",
-                    ml=app.ml,
-                    device=app.device,
-                    quiet=False,
-                    verbose=True,
-                    statistics=app.statistics,
-                    remove_small_blobs=app.remove_small_blobs,
-                    robust_crop=app.robust_crop,
-                    nr_thr_resamp=app.nr_thr_resamp,
-                    nr_thr_saving=app.nr_thr_saving,
-                    resampling_order=app.resampling_order,
-                )
+                for i, task in enumerate(tasks):
+                    if multi_task:
+                        app.call_from_thread(self.log_line, f"=== Running {i + 1}/{len(tasks)}: {task} ===")
+                    output = _ml_output_path(app.output_dir, task, multi_task) if app.ml else app.output_dir
+                    segment(
+                        input=app.scan_path,
+                        output=output,
+                        task=task,
+                        roi_subset=app.selected_tasks[task],
+                        ml=app.ml,
+                        device=app.device,
+                        quiet=False,
+                        verbose=True,
+                        statistics=app.statistics,
+                        remove_small_blobs=app.remove_small_blobs,
+                        robust_crop=app.robust_crop,
+                        nr_thr_resamp=app.nr_thr_resamp,
+                        nr_thr_saving=app.nr_thr_saving,
+                        resampling_order=app.resampling_order,
+                    )
             if app.statistics:
+                # Only meaningful for the last task run when --ml is used across
+                # multiple tasks (each writes its own statistics.json into the
+                # shared non-ml output dir, so the last one wins either way).
                 stats_dir = app.output_dir.parent if app.ml else app.output_dir
                 stats_path = stats_dir / "statistics.json"
                 app.statistics_path = stats_path if stats_path.exists() else None
@@ -124,32 +146,39 @@ class RunProgressScreen(Screen):
         from autoanatomy.engine.class_map import class_map
 
         app = self.app
-        cmap = class_map["craniofacial_structures"]
+        tasks = list(app.selected_tasks)
+        multi_task = len(tasks) > 1
         voxel_counts = {}
         volumes_mm3 = {}
 
-        if app.ml:
-            # Single multilabel file: app.output_dir is the file path itself.
-            if not app.output_dir.exists():
-                return
-            img = nib.load(str(app.output_dir))
-            data = np.asanyarray(img.dataobj)
-            voxel_vol = float(np.prod(img.header.get_zooms()))
-            for label_id, name in cmap.items():
-                voxels = int((data == label_id).sum())
-                voxel_counts[name] = voxels
-                volumes_mm3[name] = voxels * voxel_vol
-        else:
-            for label_id, name in cmap.items():
-                mask_path = app.output_dir / f"{name}.nii.gz"
-                if not mask_path.exists():
+        for task in tasks:
+            cmap = class_map[task]
+            roi_subset = app.selected_tasks[task]
+            output = _ml_output_path(app.output_dir, task, multi_task) if app.ml else app.output_dir
+
+            if app.ml:
+                if not output.exists():
                     continue
-                img = nib.load(str(mask_path))
+                img = nib.load(str(output))
                 data = np.asanyarray(img.dataobj)
                 voxel_vol = float(np.prod(img.header.get_zooms()))
-                voxels = int(data.sum())
-                voxel_counts[name] = voxels
-                volumes_mm3[name] = voxels * voxel_vol
+                for label_id, name in cmap.items():
+                    if roi_subset is not None and name not in roi_subset:
+                        continue
+                    voxels = int((data == label_id).sum())
+                    voxel_counts[name] = voxels
+                    volumes_mm3[name] = voxels * voxel_vol
+            else:
+                for label_id, name in cmap.items():
+                    mask_path = output / f"{name}.nii.gz"
+                    if not mask_path.exists():
+                        continue
+                    img = nib.load(str(mask_path))
+                    data = np.asanyarray(img.dataobj)
+                    voxel_vol = float(np.prod(img.header.get_zooms()))
+                    voxels = int(data.sum())
+                    voxel_counts[name] = voxels
+                    volumes_mm3[name] = voxels * voxel_vol
 
         app.result_voxel_counts = voxel_counts
         app.result_volumes_mm3 = volumes_mm3

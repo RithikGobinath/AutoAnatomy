@@ -35,9 +35,23 @@ class ResultsScreen(Screen):
 
     def on_mount(self) -> None:
         from autoanatomy.engine.class_map import class_map
+        from autoanatomy.engine.registry import TASK_DISPLAY_OFFSET
+
+        # Combine every selected task's classes into one {display_id: name}
+        # dict. The offset only disambiguates the table/overlay -- it's never
+        # applied to the actual saved NIfTI files, which always use each
+        # task's own native label IDs (see _load_preview and registry.py).
+        combined_map = {}
+        for task, roi_subset in self.app.selected_tasks.items():
+            offset = TASK_DISPLAY_OFFSET[task]
+            for label_id, name in class_map[task].items():
+                if roi_subset is not None and name not in roi_subset:
+                    continue
+                combined_map[offset + label_id] = name
+
         table = self.query_one("#structure-table", StructureTable)
         table.load_volumes(
-            class_map["craniofacial_structures"],
+            combined_map,
             self.app.result_volumes_mm3,
             self.app.result_voxel_counts,
         )
@@ -52,25 +66,38 @@ class ResultsScreen(Screen):
             import numpy as np
 
             from autoanatomy.engine.class_map import class_map
+            from autoanatomy.engine.registry import TASK_DISPLAY_OFFSET
+            from autoanatomy.tui.screens.run_progress import _ml_output_path
 
             img = nib.load(str(scan_path))
             volume = np.asanyarray(img.dataobj)
 
+            multi_task = len(self.app.selected_tasks) > 1
             combined_mask = np.zeros(volume.shape, dtype=np.uint8)
-            if self.app.ml:
-                if self.app.output_dir.exists():
-                    m = nib.load(str(self.app.output_dir))
+
+            for task, roi_subset in self.app.selected_tasks.items():
+                offset = TASK_DISPLAY_OFFSET[task]
+                if self.app.ml:
+                    output = _ml_output_path(self.app.output_dir, task, multi_task)
+                    if not output.exists():
+                        continue
+                    m = nib.load(str(output))
                     data = np.asanyarray(m.dataobj)
-                    if data.shape == volume.shape:
-                        combined_mask = data.astype(np.uint8)
-            else:
-                for label_id, name in class_map["craniofacial_structures"].items():
-                    mask_path = self.app.output_dir / f"{name}.nii.gz"
-                    if mask_path.exists():
+                    if data.shape != volume.shape:
+                        continue
+                    for label_id, name in class_map[task].items():
+                        if roi_subset is not None and name not in roi_subset:
+                            continue
+                        combined_mask[data == label_id] = offset + label_id
+                else:
+                    for label_id, name in class_map[task].items():
+                        mask_path = self.app.output_dir / f"{name}.nii.gz"
+                        if not mask_path.exists():
+                            continue
                         m = nib.load(str(mask_path))
                         data = np.asanyarray(m.dataobj)
                         if data.shape == volume.shape:
-                            combined_mask[data > 0] = label_id
+                            combined_mask[data > 0] = offset + label_id
 
             self.query_one("#slice-viewer", SliceViewer).set_volume(volume, combined_mask)
         except Exception:

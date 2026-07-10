@@ -17,19 +17,34 @@ from autoanatomy.engine.class_map import class_map, commercial_models
 
 
 # Selectable tasks, in the order they are offered on the command line.
-# AutoAnatomy exposes exactly one task today: craniofacial_structures. The
-# "total" entry stays in class_map.py only as an internal dependency of the
-# skull-cropping step (see engine/api.py) -- it is deliberately NOT selectable
-# here, since this build's whole point is being craniofacial-only.
+# The "total" entry stays in class_map.py only as an internal dependency of
+# the skull-cropping step (see engine/api.py) -- it is deliberately NOT
+# selectable here, since it's infrastructure, not a product task.
 TASKS = [
     "craniofacial_structures",
+    "head_muscles",
 ]
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
 # surfaced in the TUI's roadmap panel as "coming soon".
 ROADMAP_TASKS = [
-    "teeth", "head_glands_cavities", "head_muscles", "headneck_bones_vessels",
+    "teeth", "head_glands_cavities", "headneck_bones_vessels",
 ]
+
+# Both tasks' class maps use small overlapping integer label IDs (1-7 and
+# 1-11). Structure *names* never collide, so results dicts keyed by name are
+# always safe to merge across tasks -- but the slice-viewer overlay and the
+# results table's color swatches are keyed by label ID, so combining more
+# than one task's raw IDs would make unrelated structures share a color.
+# This offset exists only to disambiguate that combined *display*; it is
+# never written into the actual saved segmentation NIfTI files, which always
+# use each task's own native label IDs. Applied uniformly (even when only one
+# task is being shown) so display behavior never depends on how many tasks
+# happen to be selected in a given run.
+TASK_DISPLAY_OFFSET = {
+    "craniofacial_structures": 0,
+    "head_muscles": 100,
+}
 
 # Tasks that operate on MR images but whose name does not end in "_mr".
 _MR_TASKS_WITHOUT_SUFFIX = set()  # none in this build

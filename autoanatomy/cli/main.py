@@ -3,8 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from autoanatomy.engine.class_map import class_map
-from autoanatomy.engine.registry import TASKS, ROADMAP_TASKS, format_classes_table
+from autoanatomy.engine.registry import TASKS, ROADMAP_TASKS, format_classes_table, get_task_classes
 
 # See autoanatomy/tui/screens/run_progress.py for why this guard exists:
 # nnU-Net's background export workers can hang/crash on a disk-full write in
@@ -17,6 +16,16 @@ def resampling_order(value):
     if not 0 <= ivalue <= 5:
         raise argparse.ArgumentTypeError("resampling order must be between 0 and 5")
     return ivalue
+
+
+def _ml_output_path(output, task, multi_task):
+    """A single task keeps the exact literal path given (zero behavior change
+    for existing single-task scripts). With more than one task, suffix the
+    filename per task so the second task's --ml run can't silently overwrite
+    the first's multilabel file. Mirrors tui/screens/run_progress.py."""
+    if not multi_task:
+        return output
+    return output.with_name(f"{output.stem.removesuffix('.nii')}_{task}.nii.gz")
 
 
 def cmd_segment(args):
@@ -41,26 +50,60 @@ def cmd_segment(args):
         )
         return 1
 
-    segment(
-        input=Path(args.input),
-        output=output,
-        task=args.task,
-        ml=args.ml,
-        device=args.device,
-        quiet=args.quiet,
-        verbose=args.verbose,
-        statistics=args.statistics,
-        remove_small_blobs=args.remove_small_blobs,
-        robust_crop=args.robust_crop,
-        nr_thr_resamp=args.resample_threads,
-        nr_thr_saving=args.saving_threads,
-        resampling_order=args.resampling_order,
-    )
+    tasks = list(dict.fromkeys(args.task))  # de-dupe, preserve order
+
+    # {task: roi_subset_or_None}, only for tasks that will actually run.
+    run_plan = {}
+    if args.structures:
+        requested = [s.strip() for s in args.structures.split(",") if s.strip()]
+        unclaimed = set(requested)
+        for task in tasks:
+            valid = set(get_task_classes(task).values())
+            matched = [s for s in requested if s in valid]
+            unclaimed -= set(matched)
+            if matched:
+                run_plan[task] = matched
+            else:
+                print(f"skipping {task}: none of the requested --structures belong to it", file=sys.stderr)
+        if unclaimed:
+            print(
+                f"error: unknown structure(s) for the selected task(s): {', '.join(sorted(unclaimed))}",
+                file=sys.stderr,
+            )
+            return 1
+        if not run_plan:
+            print("error: no selected task has any of the requested --structures", file=sys.stderr)
+            return 1
+    else:
+        run_plan = {task: None for task in tasks}
+
+    multi_task = len(run_plan) > 1
+    for task, roi_subset in run_plan.items():
+        task_output = _ml_output_path(output, task, multi_task) if args.ml else output
+        segment(
+            input=Path(args.input),
+            output=task_output,
+            task=task,
+            ml=args.ml,
+            device=args.device,
+            quiet=args.quiet,
+            verbose=args.verbose,
+            statistics=args.statistics,
+            remove_small_blobs=args.remove_small_blobs,
+            robust_crop=args.robust_crop,
+            nr_thr_resamp=args.resample_threads,
+            nr_thr_saving=args.saving_threads,
+            resampling_order=args.resampling_order,
+            roi_subset=roi_subset,
+        )
     return 0
 
 
 def cmd_list_structures(args):
-    print(format_classes_table("craniofacial_structures"))
+    for i, task in enumerate(TASKS):
+        if i > 0:
+            print()
+        print(format_classes_table(task))
     print()
     print("Planned for later phases (not yet segmentable in this build):")
     for t in ROADMAP_TASKS:
@@ -91,8 +134,12 @@ def cmd_check(args):
     print(f"weights dir:    {weights_dir}")
 
     craniofacial_cached = (weights_dir / "Dataset115_mandible").exists()
+    head_muscles_cached = (weights_dir / "Dataset777_head_muscles_492subj").exists()
     crop_model_cached = (weights_dir / "Dataset298_TotalSegmentator_total_6mm_1559subj").exists()
-    print(f"weights cached: craniofacial_structures={craniofacial_cached}  crop-model={crop_model_cached}")
+    print(
+        f"weights cached: craniofacial_structures={craniofacial_cached}  "
+        f"head_muscles={head_muscles_cached}  crop-model={crop_model_cached}"
+    )
 
     total, used, free = shutil.disk_usage(home_dir.anchor or "/")
     print(f"disk free:      {free / 1e9:.1f} GB / {total / 1e9:.1f} GB")
@@ -104,6 +151,8 @@ def cmd_download_weights(args):
 
     print("Downloading craniofacial_structures model (task 115)...")
     download_pretrained_weights(115)
+    print("Downloading head_muscles model (task 777)...")
+    download_pretrained_weights(777)
     print("Downloading rough skull-cropping model (task 298)...")
     download_pretrained_weights(298)
     print("Done.")
@@ -113,19 +162,27 @@ def cmd_download_weights(args):
 def build_parser():
     parser = argparse.ArgumentParser(
         prog="autoanatomy",
-        description="Segment craniofacial structures (mandible, teeth, skull, head, sinuses) in a CT scan.",
+        description="Segment craniofacial structures and head muscles in a CT scan.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_seg = sub.add_parser(
         "segment",
-        help="Run craniofacial segmentation on a CT scan",
-        description="Example: autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures",
+        help="Run segmentation on a CT scan",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description="Examples:\n"
+                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures\n"
+                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures head_muscles",
     )
     p_seg.add_argument("-i", "--input", required=True, help="CT NIfTI file or DICOM folder")
     p_seg.add_argument("-o", "--output", required=True, help="Output directory (or file path if --ml)")
-    p_seg.add_argument("-ta", "--task", default="craniofacial_structures", choices=TASKS,
-                        help="Segmentation task (default: craniofacial_structures -- the only task this build supports)")
+    p_seg.add_argument("-ta", "--task", nargs="+", default=["craniofacial_structures"], choices=TASKS,
+                        help="One or more segmentation tasks to run, space-separated (default: "
+                             "craniofacial_structures). Run 'autoanatomy list-structures' to see every "
+                             "task and the structures it produces.")
+    p_seg.add_argument("--structures", metavar="NAME[,NAME...]",
+                        help="Only save these structures (comma-separated names, matched against whichever "
+                             "selected task(s) they belong to). Default: all structures for every selected task.")
     p_seg.add_argument("--ml", action="store_true", help="Write a single multilabel NIfTI instead of one file per structure")
     p_seg.add_argument("--device", default="gpu", help="gpu | cpu | mps | gpu:X (default: gpu)")
     p_seg.add_argument("-q", "--quiet", action="store_true")
@@ -152,7 +209,7 @@ def build_parser():
     p_check = sub.add_parser("check", help="Report GPU/CUDA, weight cache, and disk status")
     p_check.set_defaults(func=cmd_check)
 
-    p_dl = sub.add_parser("download-weights", help="Download the craniofacial_structures and crop models")
+    p_dl = sub.add_parser("download-weights", help="Download all task models and the shared crop model")
     p_dl.set_defaults(func=cmd_download_weights)
 
     return parser

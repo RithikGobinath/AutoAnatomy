@@ -122,6 +122,9 @@ def download_pretrained_weights(task_id):
     elif task_id == 115:
         weights_path = config_dir / "Dataset115_mandible"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset115_mandible.zip"
+    elif task_id == 777:
+        weights_path = config_dir / "Dataset777_head_muscles_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset777_head_muscles_492subj.zip"
 
 
     else:

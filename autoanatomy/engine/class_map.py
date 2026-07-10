@@ -132,6 +132,22 @@ class_map = {
         5: "sinus_maxillary",
         6: "sinus_frontal",
         7: "teeth_upper"
+    },
+
+    # Second AutoAnatomy product task: chewing/swallowing muscles of the head.
+    # Also crops to "skull" via the total class map, same as craniofacial_structures.
+    "head_muscles": {
+        1: "masseter_right",
+        2: "masseter_left",
+        3: "temporalis_right",
+        4: "temporalis_left",
+        5: "lateral_pterygoid_right",
+        6: "lateral_pterygoid_left",
+        7: "medial_pterygoid_right",
+        8: "medial_pterygoid_left",
+        9: "tongue",
+        10: "digastric_right",
+        11: "digastric_left"
     }
 }
 

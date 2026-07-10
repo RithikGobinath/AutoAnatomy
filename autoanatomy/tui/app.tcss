@@ -76,3 +76,9 @@ Screen {
 .advanced-row Input {
     width: 12;
 }
+
+.task-structures {
+    height: auto;
+    padding-left: 4;
+    margin-bottom: 1;
+}

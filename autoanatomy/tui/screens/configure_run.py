@@ -1,3 +1,4 @@
+import re
 from pathlib import Path
 
 from textual.app import ComposeResult
@@ -8,11 +9,16 @@ from textual.widgets import (
 )
 
 from autoanatomy.engine.class_map import class_map
+from autoanatomy.engine.registry import TASKS
 
 DEFAULT_BLOB_THRESHOLD_MM3 = 200
 DEFAULT_RESAMPLE_THREADS = 1
 DEFAULT_SAVING_THREADS = 6
 DEFAULT_RESAMPLING_ORDER = 3
+
+
+def _structure_checkbox_id(name: str) -> str:
+    return "struct-" + re.sub(r"[^a-zA-Z0-9_-]", "-", name)
 
 
 class ConfigureRunScreen(Screen):
@@ -24,9 +30,17 @@ class ConfigureRunScreen(Screen):
             yield Static("Configure segmentation", classes="section-title")
             yield Static(f"Scan: [b]{self.app.scan_path}[/b]")
 
-            yield Static("\nStructures that will be segmented (fixed for task craniofacial_structures):")
-            structures = ", ".join(class_map["craniofacial_structures"].values())
-            yield Static(f"  {structures}", classes="hint")
+            yield Static("\nTasks (any combination -- each run independently, results are combined):")
+            for i, task in enumerate(TASKS):
+                # Preserve today's default: only the first task runs unless you
+                # opt in to more -- a second task roughly doubles run time.
+                yield Checkbox(f"Include {task}", value=(i == 0), id=f"task-enable-{i}")
+                with Vertical(id=f"structures-container-{i}", classes="task-structures"):
+                    for widget in self._build_structure_checkboxes(task):
+                        yield widget
+            yield Static("[dim]Unchecking a structure still runs the full model for its task -- it only "
+                         "changes which output files are saved.[/dim]")
+            yield Static("", id="structures-error")
 
             yield Static("\nDevice:")
             with RadioSet(id="device-set"):
@@ -40,8 +54,8 @@ class ConfigureRunScreen(Screen):
             yield Input(value=default_out, id="output-input")
 
             yield Static(
-                "\n[dim]0.5mm isotropic resolution, fixed by the model. --fast is not "
-                "supported for this task (fixed model constraint).[/dim]"
+                "\n[dim]Resampling resolution is fixed per task by the model. --fast is not "
+                "supported for either task in this build (fixed model constraint).[/dim]"
             )
 
             with Collapsible(title="Advanced settings", collapsed=True):
@@ -72,6 +86,12 @@ class ConfigureRunScreen(Screen):
                 yield Button("Back", id="back-btn")
         yield Footer()
 
+    def _build_structure_checkboxes(self, task: str) -> list[Checkbox]:
+        return [
+            Checkbox(name, value=True, id=_structure_checkbox_id(name))
+            for name in class_map[task].values()
+        ]
+
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "back-btn":
             self.app.pop_screen()
@@ -95,6 +115,31 @@ class ConfigureRunScreen(Screen):
             return default
 
     def _start_run(self) -> None:
+        error = self.query_one("#structures-error", Static)
+        selected_tasks = {}
+
+        for i, task in enumerate(TASKS):
+            if not self.query_one(f"#task-enable-{i}", Checkbox).value:
+                continue
+
+            checked_names = [
+                name for name in class_map[task].values()
+                if self.query_one(f"#{_structure_checkbox_id(name)}", Checkbox).value
+            ]
+            if not checked_names:
+                error.update(f"[red]'{task}' is included but has no structures selected -- "
+                             "either uncheck the task or select at least one structure.[/red]")
+                return
+
+            all_names = list(class_map[task].values())
+            selected_tasks[task] = None if len(checked_names) == len(all_names) else checked_names
+
+        if not selected_tasks:
+            error.update("[red]Include at least one task.[/red]")
+            return
+
+        self.app.selected_tasks = selected_tasks
+
         device_set = self.query_one("#device-set", RadioSet)
         pressed = device_set.pressed_button
         self.app.device = "cpu" if pressed and pressed.id == "dev-cpu" else "gpu"

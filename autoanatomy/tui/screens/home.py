@@ -6,7 +6,6 @@ from textual.widgets import Button, Footer, Header, Static
 ROADMAP = [
     ("teeth", "77 classes — individual teeth (FDI notation), pulp, canals, implants"),
     ("head_glands_cavities", "eyes, optic nerves, parotid/submandibular glands, nasal cavity"),
-    ("head_muscles", "masseter, temporalis, pterygoids, tongue"),
     ("headneck_bones_vessels", "larynx, hyoid, zygomatic arch, carotid/jugular vessels"),
 ]
 

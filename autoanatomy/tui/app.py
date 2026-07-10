@@ -21,6 +21,10 @@ class AutoAnatomyApp(App):
 
     # Shared run state, read/written by screens as the user moves through the flow.
     scan_path: Path | None = None
+    # {task_name: roi_subset_or_None} -- only entries for tasks the user
+    # included this run. None means "all structures for that task" (today's
+    # no-op-filter default); a list means only those structure names.
+    selected_tasks: dict = {}
     device: str = "gpu"
     ml: bool = False
     output_dir: Path | None = None

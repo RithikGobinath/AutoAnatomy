@@ -214,10 +214,20 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         model = "3d_fullres"
         folds = [0]
         if fast: raise ValueError("task craniofacial_structures does not work with option --fast")
+    elif task == "head_muscles":
+        task_id = 777
+        resample = [0.75, 0.75, 1.0]
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+        crop = ["skull"]
+        crop_addon = [10, 10, 10]
+        model = "3d_fullres_high"
+        folds = [0]
+        if fast: raise ValueError("task head_muscles does not work with option --fast")
     else:
         raise ValueError(
             f"Unknown task '{task}'. This build of AutoAnatomy only supports "
-            "task='craniofacial_structures' (mandible, teeth, skull, head, sinuses)."
+            "task='craniofacial_structures' (mandible, teeth, skull, head, sinuses) "
+            "or task='head_muscles' (masseter, temporalis, pterygoids, tongue, digastric)."
         )
 
     if crop_path is None:
@@ -259,8 +269,10 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
 
     if roi_subset is not None and type(roi_subset) is not list:
         raise ValueError("roi_subset must be a list of strings")
-    if roi_subset is not None and not task.startswith("total"):
-        raise ValueError("roi_subset only works with task 'total' or 'total_mr'")
+    if roi_subset is not None:
+        from autoanatomy.engine.registry import TASKS
+        if task not in TASKS:
+            raise ValueError(f"roi_subset is only supported for selectable tasks: {', '.join(TASKS)}")
 
     if task.endswith("_mr"):
         if body_seg:
