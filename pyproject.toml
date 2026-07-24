@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autoanatomy"
-version = "0.1.0.dev0"
+version = "0.2.0"
 description = "Craniofacial CT segmentation (mandible, teeth, skull, head, sinuses) with a terminal GUI."
 readme = "README.md"
 requires-python = ">=3.10"
