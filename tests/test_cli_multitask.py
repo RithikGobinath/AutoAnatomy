@@ -18,10 +18,10 @@ def _args(**overrides):
         verbose=False,
         statistics=False,
         remove_small_blobs=False,
-        robust_crop=False,
         resample_threads=1,
         saving_threads=6,
         resampling_order=3,
+        parallel_tasks=False,
     )
     for k, v in overrides.items():
         setattr(ns, k, v)

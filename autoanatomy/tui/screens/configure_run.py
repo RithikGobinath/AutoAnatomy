@@ -76,6 +76,12 @@ class ConfigureRunScreen(Screen):
                     yield Static("  Resampling order (0-5):", classes="hint")
                     yield Input(value=str(DEFAULT_RESAMPLING_ORDER), id="resampling-order-input", type="integer")
 
+                yield Checkbox(
+                    "Run tasks in parallel (faster with multiple tasks selected -- "
+                    "uses more RAM/VRAM at once)",
+                    id="parallel-tasks-checkbox",
+                )
+
             with Vertical():
                 yield Button("Run Segmentation", id="run-btn", variant="primary")
                 yield Button("Back", id="back-btn")
@@ -155,6 +161,7 @@ class ConfigureRunScreen(Screen):
         self.app.nr_thr_saving = self._num("saving-threads-input", int, DEFAULT_SAVING_THREADS)
         order = self._num("resampling-order-input", int, DEFAULT_RESAMPLING_ORDER)
         self.app.resampling_order = min(5, max(0, order))
+        self.app.parallel_tasks = self.query_one("#parallel-tasks-checkbox", Checkbox).value
 
         from autoanatomy.tui.screens.run_progress import RunProgressScreen
         self.app.push_screen(RunProgressScreen())

@@ -37,6 +37,10 @@ class AutoAnatomyApp(App):
     nr_thr_resamp: int = 1
     nr_thr_saving: int = 6
     resampling_order: int = 3
+    # Off by default -- running more than one task at once means every
+    # task's model is loaded into memory (and, on GPU, VRAM) simultaneously
+    # instead of one at a time.
+    parallel_tasks: bool = False
     statistics_path: Path | None = None
 
     def on_mount(self) -> None:

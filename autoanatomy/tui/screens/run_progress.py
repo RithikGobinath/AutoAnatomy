@@ -103,28 +103,47 @@ class RunProgressScreen(Screen):
             )
             return
 
+        def _task_kwargs(task):
+            return dict(
+                input=app.scan_path,
+                output=_ml_output_path(app.output_dir, task, multi_task) if app.ml else app.output_dir,
+                task=task,
+                roi_subset=app.selected_tasks[task],
+                ml=app.ml,
+                device=app.device,
+                quiet=False,
+                verbose=True,
+                statistics=app.statistics,
+                remove_small_blobs=app.remove_small_blobs,
+                nr_thr_resamp=app.nr_thr_resamp,
+                nr_thr_saving=app.nr_thr_saving,
+                resampling_order=app.resampling_order,
+            )
+
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
             with _redirect_stdout(stream):
-                for i, task in enumerate(tasks):
-                    if multi_task:
-                        app.call_from_thread(self.log_line, f"=== Running {i + 1}/{len(tasks)}: {task} ===")
-                    output = _ml_output_path(app.output_dir, task, multi_task) if app.ml else app.output_dir
-                    segment(
-                        input=app.scan_path,
-                        output=output,
-                        task=task,
-                        roi_subset=app.selected_tasks[task],
-                        ml=app.ml,
-                        device=app.device,
-                        quiet=False,
-                        verbose=True,
-                        statistics=app.statistics,
-                        remove_small_blobs=app.remove_small_blobs,
-                        nr_thr_resamp=app.nr_thr_resamp,
-                        nr_thr_saving=app.nr_thr_saving,
-                        resampling_order=app.resampling_order,
+                if app.parallel_tasks and multi_task:
+                    from autoanatomy.engine.parallel_runner import run_tasks_concurrently
+
+                    app.call_from_thread(
+                        self.log_line, f"Running {len(tasks)} tasks in parallel: {', '.join(tasks)}",
                     )
+
+                    def _on_task_done(task_name, output_text, error):
+                        app.call_from_thread(self.log_line, f"=== {task_name} ({'failed' if error else 'done'}) ===")
+                        for line in output_text.splitlines():
+                            if line.strip():
+                                app.call_from_thread(self.log_line, line)
+                        if error:
+                            app.call_from_thread(self.log_line, f"error: {error}")
+
+                    run_tasks_concurrently([_task_kwargs(t) for t in tasks], on_task_done=_on_task_done)
+                else:
+                    for i, task in enumerate(tasks):
+                        if multi_task:
+                            app.call_from_thread(self.log_line, f"=== Running {i + 1}/{len(tasks)}: {task} ===")
+                        segment(**_task_kwargs(task))
             if app.statistics:
                 # Only meaningful for the last task run when --ml is used across
                 # multiple tasks (each writes its own statistics.json into the
