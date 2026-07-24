@@ -119,14 +119,34 @@ def download_pretrained_weights(task_id):
     elif task_id == 298:
         weights_path = config_dir / "Dataset298_TotalSegmentator_total_6mm_1559subj"
         WEIGHTS_URL = url + "/v2.0.0-weights/Dataset298_TotalSegmentator_total_6mm_1559subj.zip"
+    elif task_id == 294:
+        # The "total" task's full 1.5mm resolution is normally an ensemble of 5
+        # part-models (291-295); "skull" only lives in this one (part4, muscles),
+        # so the 1.5mm crop tier downloads just this single part instead of all 5.
+        weights_path = config_dir / "Dataset294_TotalSegmentator_part4_muscles_1559subj"
+        WEIGHTS_URL = url + "/v2.0.0-weights/Dataset294_TotalSegmentator_part4_muscles_1559subj.zip"
     elif task_id == 115:
         weights_path = config_dir / "Dataset115_mandible"
         WEIGHTS_URL = url + "/v2.5.0-weights/Dataset115_mandible.zip"
     elif task_id == 777:
         weights_path = config_dir / "Dataset777_head_muscles_492subj"
         WEIGHTS_URL = url + "/v2.3.0-weights/Dataset777_head_muscles_492subj.zip"
-
-
+    elif task_id == 112:
+        # DentalSegmentator (Dot et al., J Dentistry 2024) -- an independently
+        # published, CC-BY 4.0 nnU-Net v2 checkpoint, not part of upstream
+        # TotalSegmentator. Only "upper_skull", "mandible" and
+        # "mandibular_canal" are exposed by class_map["dental_segmentator"];
+        # its "upper_teeth"/"lower_teeth" classes are computed but never
+        # surfaced, since the "toothseg" task supersedes them.
+        weights_path = config_dir / "Dataset112_DentalSegmentator_v100"
+        WEIGHTS_URL = "https://zenodo.org/records/10829675/files/Dataset112_DentalSegmentator_v100.zip"
+    elif task_id in (121, 123):
+        # ToothSeg (van Nistelrooij, Kramer et al., IEEE JBHI 2026) -- individual
+        # per-tooth (FDI) instance segmentation. Both its semantic (121) and
+        # instance/border-core (123) branches ship in one Zenodo release, so
+        # they share a dedicated download helper instead of this if/elif chain.
+        _download_toothseg_weights(config_dir)
+        return
     else:
         raise ValueError(f"For task_id {task_id} no download path was found.")
 
@@ -135,6 +155,37 @@ def download_pretrained_weights(task_id):
         print(f"Downloading model for Task {task_id} ...")
         weights_path.parent.mkdir(exist_ok=True, parents=True)
         download_url_and_unpack(WEIGHTS_URL, weights_path.parent)
+
+
+def _download_toothseg_weights(config_dir):
+    """Download and unpack the ToothSeg checkpoint release.
+
+    Both branch checkpoints (Dataset121_ToothFairy2_Teeth,
+    Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px) are bundled together
+    inside a single Zenodo zip, wrapped in one extra "ToothSeg/" folder. This
+    flattens both dataset folders up to config_dir directly, so they line up
+    with every other model's flat "config_dir/DatasetXXX_.../" layout.
+    """
+    sem_path = config_dir / "Dataset121_ToothFairy2_Teeth"
+    inst_path = config_dir / "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px"
+    if sem_path.exists() and inst_path.exists():
+        return
+
+    print("Downloading ToothSeg model (semantic + instance branches, ~920MB) ...")
+    url = "https://zenodo.org/records/14893540/files/ToothSeg.zip"
+    tmp_extract_dir = config_dir / "_toothseg_download_tmp"
+    tmp_extract_dir.mkdir(exist_ok=True, parents=True)
+    try:
+        download_url_and_unpack(url, tmp_extract_dir)
+        extracted_root = tmp_extract_dir / "ToothSeg"
+        for name in (sem_path.name, inst_path.name):
+            src = extracted_root / name
+            dst = config_dir / name
+            if dst.exists():
+                robust_rmtree(dst)
+            shutil.move(str(src), str(dst))
+    finally:
+        robust_rmtree(tmp_extract_dir)
 
 
 def combine_masks_to_multilabel_file(masks_dir, multilabel_file):

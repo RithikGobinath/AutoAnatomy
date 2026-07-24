@@ -23,27 +23,35 @@ from autoanatomy.engine.class_map import class_map, commercial_models
 TASKS = [
     "craniofacial_structures",
     "head_muscles",
+    "dental_segmentator",
+    "toothseg",
 ]
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
-# surfaced in the TUI's roadmap panel as "coming soon".
+# surfaced in the TUI's roadmap panel as "coming soon". ("teeth" is no longer
+# listed here -- the "toothseg" task above now covers individual-tooth
+# segmentation, via a different published model than upstream's "teeth" task.)
 ROADMAP_TASKS = [
-    "teeth", "head_glands_cavities", "headneck_bones_vessels",
+    "head_glands_cavities", "headneck_bones_vessels",
 ]
 
-# Both tasks' class maps use small overlapping integer label IDs (1-7 and
-# 1-11). Structure *names* never collide, so results dicts keyed by name are
-# always safe to merge across tasks -- but the slice-viewer overlay and the
-# results table's color swatches are keyed by label ID, so combining more
-# than one task's raw IDs would make unrelated structures share a color.
-# This offset exists only to disambiguate that combined *display*; it is
-# never written into the actual saved segmentation NIfTI files, which always
-# use each task's own native label IDs. Applied uniformly (even when only one
-# task is being shown) so display behavior never depends on how many tasks
-# happen to be selected in a given run.
+# Every task's class map uses small (or, for toothseg, FDI-numbered) integer
+# label IDs that overlap across tasks. Structure *names* never collide, so
+# results dicts keyed by name are always safe to merge across tasks -- but
+# the slice-viewer overlay and the results table's color swatches are keyed
+# by label ID, so combining more than one task's raw IDs would make unrelated
+# structures share a color. This offset exists only to disambiguate that
+# combined *display*; it is never written into the actual saved segmentation
+# NIfTI files, which always use each task's own native label IDs. Applied
+# uniformly (even when only one task is being shown) so display behavior
+# never depends on how many tasks happen to be selected in a given run.
 TASK_DISPLAY_OFFSET = {
     "craniofacial_structures": 0,
     "head_muscles": 100,
+    "dental_segmentator": 200,
+    # toothseg's own label IDs are already the two-digit FDI numbers (11-48),
+    # so no offset is needed to keep them clear of the ranges above.
+    "toothseg": 0,
 }
 
 # Tasks that operate on MR images but whose name does not end in "_mr".

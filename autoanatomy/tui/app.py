@@ -34,7 +34,6 @@ class AutoAnatomyApp(App):
     # Advanced settings -- all real, thread straight through to engine.api.segment().
     statistics: bool = False
     remove_small_blobs: bool = False
-    robust_crop: bool = False
     nr_thr_resamp: int = 1
     nr_thr_saving: int = 6
     resampling_order: int = 3

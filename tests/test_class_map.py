@@ -41,7 +41,7 @@ def test_head_muscles_matches_upstream():
 
 
 def test_selectable_tasks():
-    assert TASKS == ["craniofacial_structures", "head_muscles"]
+    assert TASKS == ["craniofacial_structures", "head_muscles", "dental_segmentator", "toothseg"]
 
 
 def test_no_task_requires_a_license():

@@ -66,11 +66,6 @@ class ConfigureRunScreen(Screen):
                     yield Static("  Threshold (mm³):", classes="hint")
                     yield Input(value=str(DEFAULT_BLOB_THRESHOLD_MM3), id="blobs-threshold-input", type="number")
 
-                yield Checkbox(
-                    "Robust crop (slower 3mm skull-localization model, more reliable on unusual scans)",
-                    id="robust-crop-checkbox",
-                )
-
                 with Horizontal(classes="advanced-row"):
                     yield Static("  Resample threads:", classes="hint")
                     yield Input(value=str(DEFAULT_RESAMPLE_THREADS), id="resample-threads-input", type="integer")
@@ -156,7 +151,6 @@ class ConfigureRunScreen(Screen):
         else:
             self.app.remove_small_blobs = False
 
-        self.app.robust_crop = self.query_one("#robust-crop-checkbox", Checkbox).value
         self.app.nr_thr_resamp = self._num("resample-threads-input", int, DEFAULT_RESAMPLE_THREADS)
         self.app.nr_thr_saving = self._num("saving-threads-input", int, DEFAULT_SAVING_THREADS)
         order = self._num("resampling-order-input", int, DEFAULT_RESAMPLING_ORDER)

@@ -90,7 +90,6 @@ def cmd_segment(args):
             verbose=args.verbose,
             statistics=args.statistics,
             remove_small_blobs=args.remove_small_blobs,
-            robust_crop=args.robust_crop,
             nr_thr_resamp=args.resample_threads,
             nr_thr_saving=args.saving_threads,
             resampling_order=args.resampling_order,
@@ -192,9 +191,6 @@ def build_parser():
                         help="Compute per-structure volume/intensity stats and write statistics.json next to the output")
     p_seg.add_argument("--remove-small-blobs", nargs="?", const=200.0, default=False, type=float, metavar="MM3",
                         help="Postprocessing cleanup: drop disconnected blobs smaller than MM3 (default 200mm^3 if given with no value)")
-    p_seg.add_argument("--robust-crop", action="store_true",
-                        help="Use the slower 3mm model (instead of the default 6mm) to locate the skull before "
-                             "running the high-res model -- more robust on unusual scans, at the cost of speed")
     p_seg.add_argument("--resample-threads", type=int, default=1, metavar="N",
                         help="Threads used for image resampling (default: 1)")
     p_seg.add_argument("--saving-threads", type=int, default=6, metavar="N",

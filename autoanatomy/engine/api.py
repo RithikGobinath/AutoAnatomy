@@ -125,6 +125,87 @@ def build_run_report(input, output, task, device, fast, fastest, ml, output_type
     }
 
 
+def _run_toothseg_task(input, output, ml, roi_subset, device, nr_thr_resamp, quiet, verbose,
+                       statistics, stats_aggregation, statistics_exclude_masks_at_border,
+                       statistics_normalized_intensities, statistics_extra, remove_small_blobs):
+    """Run the "toothseg" task end to end: inference (toothseg_runner), then
+    the same roi_subset filtering / saving / statistics conventions every
+    other AutoAnatomy task follows, so it's a drop-in alternative to the
+    single-checkpoint nnUNet_predict_image path used by the other three tasks.
+    """
+    from autoanatomy.engine.toothseg_runner import run_toothseg
+    from autoanatomy.engine.nifti_ext_header import add_label_map_to_nifti, save_multilabel_nifti
+    from autoanatomy.engine.postprocessing import remove_small_blobs_multilabel
+    from autoanatomy.engine.dicom_io import dcm_to_nifti
+
+    label_map = dict(class_map["toothseg"])
+    if roi_subset is not None:
+        label_map = {k: v for k, v in label_map.items() if v in roi_subset}
+
+    if isinstance(input, Nifti1Image):
+        img_in = input
+    else:
+        input = Path(input)
+        if str(input).endswith(".nii") or str(input).endswith(".nii.gz"):
+            img_in = nib.load(input)
+        else:
+            with tempfile.TemporaryDirectory(prefix="toothseg_dcm_", ignore_cleanup_errors=True) as tmp:
+                tmp_dir = Path(tmp)
+                (tmp_dir / "dcm").mkdir()
+                dcm_to_nifti(input, tmp_dir / "dcm" / "converted.nii.gz", tmp_dir, verbose=verbose)
+                img_in = nib.load(tmp_dir / "dcm" / "converted.nii.gz")
+
+    seg_img = run_toothseg(img_in, device=device, nr_threads_resampling=nr_thr_resamp,
+                           quiet=quiet, verbose=verbose)
+
+    seg_data = np.asarray(seg_img.dataobj).astype(np.uint8)
+    if roi_subset is not None:
+        seg_data = np.where(np.isin(seg_data, list(label_map.keys())), seg_data, 0).astype(np.uint8)
+
+    if remove_small_blobs:
+        if not quiet: print("Removing small blobs...")
+        vox_vol = np.prod(seg_img.header.get_zooms())
+        size_thr_mm3 = 200 if remove_small_blobs is True else remove_small_blobs
+        seg_data = remove_small_blobs_multilabel(seg_data, label_map, list(label_map.values()),
+                                                 interval=[size_thr_mm3 / vox_vol, 1e10], quiet=quiet)
+
+    seg_img = nib.Nifti1Image(seg_data, seg_img.affine)
+
+    if output is not None:
+        output = Path(output)
+        if ml:
+            output.parent.mkdir(exist_ok=True, parents=True)
+            save_multilabel_nifti(seg_img, output, label_map)
+        else:
+            output.mkdir(exist_ok=True, parents=True)
+            for label_id, name in label_map.items():
+                nib.save(nib.Nifti1Image((seg_data == label_id).astype(np.uint8), seg_img.affine),
+                        output / f"{name}.nii.gz")
+
+    stats = None
+    if statistics:
+        if not quiet: print("Calculating statistics...")
+        if isinstance(statistics, (str, Path)):
+            stats_file = Path(statistics).absolute()
+        elif output is not None:
+            stats_dir = output.parent if ml else output
+            stats_file = stats_dir / "statistics.json"
+        else:
+            stats_file = None
+        stats = get_basic_statistics(seg_data, img_in, stats_file,
+                                     quiet, "toothseg", statistics_exclude_masks_at_border,
+                                     roi_subset, metric=stats_aggregation,
+                                     normalized_intensities=statistics_normalized_intensities,
+                                     extra_metrics=statistics_extra)
+
+    try:
+        increase_prediction_counter()
+    except Exception:
+        pass
+
+    if statistics:
+        return seg_img, stats
+    return seg_img
 
 
 def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]=None, ml=False, nr_thr_resamp=1, nr_thr_saving=6,
@@ -193,6 +274,23 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
     setup_nnunet()
     setup_totalseg()
 
+    if task == "toothseg":
+        if fast:
+            raise ValueError("task toothseg does not work with option --fast")
+        # ToothSeg does not go through the single-checkpoint nnUNet_predict_image
+        # path the other three tasks use -- it runs two independent nnU-Net
+        # checkpoints plus custom postprocessing (see toothseg_runner.py), so it
+        # is dispatched here, before any of the shared crop/resample machinery
+        # below (which assumes exactly one prediction checkpoint per task).
+        return _run_toothseg_task(
+            input, output, ml=ml, roi_subset=roi_subset, device=device,
+            nr_thr_resamp=nr_thr_resamp, quiet=quiet, verbose=verbose,
+            statistics=statistics, stats_aggregation=stats_aggregation,
+            statistics_exclude_masks_at_border=statistics_exclude_masks_at_border,
+            statistics_normalized_intensities=statistics_normalized_intensities,
+            statistics_extra=statistics_extra, remove_small_blobs=remove_small_blobs,
+        )
+
     from autoanatomy.engine.nnunet_runner import nnUNet_predict_image  # this has to be after setting new env vars
 
     crop_model = None
@@ -209,8 +307,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         task_id = 115
         resample = [0.5, 0.5, 0.5]
         trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
-        crop = ["skull"]
-        crop_addon = [20, 20, 20]
+        crop = None  # no skull-localization pre-crop -- runs on the full input image
         model = "3d_fullres"
         folds = [0]
         if fast: raise ValueError("task craniofacial_structures does not work with option --fast")
@@ -218,17 +315,41 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         task_id = 777
         resample = [0.75, 0.75, 1.0]
         trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
-        crop = ["skull"]
-        crop_addon = [10, 10, 10]
+        crop = None  # no skull-localization pre-crop -- runs on the full input image
         model = "3d_fullres_high"
         folds = [0]
         if fast: raise ValueError("task head_muscles does not work with option --fast")
+    elif task == "dental_segmentator":
+        # DentalSegmentator (Dot et al., J Dentistry 2024; CC-BY 4.0;
+        # Dataset112_DentalSegmentator_v100). Only exists for maximum-precision
+        # use, so it always uses the smoothest resampling path, regardless of
+        # the caller's own higher_order_resampling setting. No skull-
+        # localization pre-crop -- runs on the full input image.
+        task_id = 112
+        resample = [0.43164101243019104, 0.31200000643730164, 0.43164101243019104]
+        trainer = "nnUNetTrainer"
+        crop = None
+        model = "3d_fullres"
+        folds = [0]
+        higher_order_resampling = True
+        if roi_subset is None:
+            # Without this, --ml output would still contain the model's raw
+            # upper_teeth/lower_teeth voxel values even though they're absent
+            # from class_map/the label-map header (roi_subset is what makes
+            # nnunet_runner.py zero out non-selected classes before saving).
+            roi_subset = list(class_map["dental_segmentator"].values())
+        if fast: raise ValueError("task dental_segmentator does not work with option --fast")
     else:
         raise ValueError(
             f"Unknown task '{task}'. This build of AutoAnatomy only supports "
-            "task='craniofacial_structures' (mandible, teeth, skull, head, sinuses) "
-            "or task='head_muscles' (masseter, temporalis, pterygoids, tongue, digastric)."
+            "task='craniofacial_structures' (mandible, teeth, skull, head, sinuses), "
+            "task='head_muscles' (masseter, temporalis, pterygoids, tongue, digastric), "
+            "task='dental_segmentator' (upper_skull, mandible, mandibular_canal), or "
+            "task='toothseg' (individual FDI-numbered teeth)."
         )
+
+    if robust_crop not in (False, True, "3mm", "1.5mm"):
+        raise ValueError(f"robust_crop must be False, True, '3mm', or '1.5mm', got {robust_crop!r}")
 
     if crop_path is None:
         crop_path = output.parent if output is not None else None
@@ -283,22 +404,37 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         resample = None
         save_lowres = False
 
-    if save_lowres and (crop is not None or roi_subset is not None or cascade or body_seg):
-        raise ValueError("save_lowres is not supported together with cropping, roi_subset, body_seg, or cascade.")
+    if save_lowres and (crop is not None or cascade or body_seg):
+        raise ValueError("save_lowres is not supported together with cropping, body_seg, or cascade.")
 
-    # Generate rough organ segmentation (6mm) for speed up if crop or roi_subset is used
-    # (for "fast" on GPU it makes no big difference, but on CPU it can help even for "fast")
-    if crop is not None or roi_subset is not None or cascade:
+    # Generate rough organ segmentation (6mm) for speed up if crop is used.
+    # Deliberately NOT triggered by roi_subset alone: none of AutoAnatomy's
+    # tasks ever crop (see the per-task branches above, all of which set
+    # crop=None), and roi_subset is still used further below purely as an
+    # output filter (which structures get saved), independent of cropping.
+    if crop is not None or cascade:
 
         body_seg = False  # can not be used together with body_seg
         st = time.time()
         if not quiet: print("Generating rough segmentation for cropping...")
 
         if crop_model is None:  # use default "total" model for cropping
-            if robust_rs or robust_crop:
+            if robust_crop == "1.5mm":
+                # The "total" task's real 1.5mm resolution is normally an
+                # ensemble of 5 part-models (291-295), but "skull" only lives
+                # in part4 (class_map_part_muscles / task 294), so requesting
+                # just that one part gives a full-resolution skull crop
+                # without paying for the other 4 unrelated part-models.
+                print("  (Using the finest 1.5mm skull-localization model for cropping -- much slower; "
+                      "only worth it if 3mm crop is unreliable on this scan.)")
+                crop_model_task = [294]
+                crop_spacing = 1.5
+                crop_trainer = "nnUNetTrainerNoMirroring"
+            elif robust_rs or robust_crop:
                 print("  (Using more robust (but slower) 3mm model for cropping.)")
                 crop_model_task = 852 if task.endswith("_mr") else 297
                 crop_spacing = 3.0
+                crop_trainer = "nnUNetTrainer_2000epochs_NoMirroring" if task.endswith("_mr") else "nnUNetTrainer_4000epochs_NoMirroring"
             else:
                 # For MR always run 3mm model for cropping, because 6mm too bad results
                 #  (runtime for 3mm still very good for MR)
@@ -308,18 +444,22 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                 else:
                     crop_model_task = 298
                     crop_spacing = 6.0
+                crop_trainer = "nnUNetTrainer_2000epochs_NoMirroring" if task.endswith("_mr") else "nnUNetTrainer_4000epochs_NoMirroring"
             if task.endswith("_mr") or modality == "mr":
                 crop_task = "total_mr"
             else:
                 crop_task = "total"
-            crop_trainer = "nnUNetTrainer_2000epochs_NoMirroring" if task.endswith("_mr") else "nnUNetTrainer_4000epochs_NoMirroring"
             if crop is not None and ("body_trunc" in crop or "body_extremities" in crop):
                 crop_model_task = 300
                 crop_spacing = 6.0
                 crop_trainer = "nnUNetTrainer"
                 crop_task = "body"
-            download_pretrained_weights(crop_model_task)
-            
+            if type(crop_model_task) is list:
+                for tid in crop_model_task:
+                    download_pretrained_weights(tid)
+            else:
+                download_pretrained_weights(crop_model_task)
+
             organ_seg, _, _ = nnUNet_predict_image(input, None, crop_model_task, model="3d_fullres", folds=[0],
                                 trainer=crop_trainer, tta=False, multilabel_image=True, resample=crop_spacing,
                                 crop=None, crop_path=None, task_name=crop_task, nora_tag="None", preview=False,

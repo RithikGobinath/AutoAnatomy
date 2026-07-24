@@ -148,8 +148,56 @@ class_map = {
         9: "tongue",
         10: "digastric_right",
         11: "digastric_left"
-    }
+    },
+
+    # Third AutoAnatomy product task: DentalSegmentator (Dot et al., J Dentistry
+    # 2024; CC-BY 4.0; Dataset112_DentalSegmentator_v100, task_id 112). The
+    # underlying model also predicts "upper_teeth"/"lower_teeth" (raw label IDs
+    # 3 and 4), but those are deliberately left out of this map -- the
+    # "toothseg" task below supersedes them with individually-numbered,
+    # finer-resolution teeth, so this task exists only for the three
+    # structures nothing else in this build covers at this precision.
+    "dental_segmentator": {
+        1: "upper_skull",
+        # Named distinctly from craniofacial_structures' own "mandible" -- both
+        # tasks independently produce a mandible mask, and structure names must
+        # stay unique across every task (see tests/test_class_map.py), since
+        # per-file saving and the multi-task results table both key by name.
+        # This is the more precise of the two (see engine/api.py's
+        # "dental_segmentator" branch).
+        2: "mandible_precise",
+        5: "mandibular_canal",
+    },
+
+    # Fourth AutoAnatomy product task: ToothSeg (van Nistelrooij, Kramer et al.,
+    # IEEE JBHI 2026; Apache-2.0/CC-BY 4.0; Datasets 121+123). Individual tooth
+    # instance segmentation and FDI numbering -- see engine/toothseg_runner.py
+    # for the custom two-branch inference pipeline this task requires (it does
+    # not go through the single-checkpoint nnUNet_predict_image path the other
+    # three tasks use). Label IDs are the real two-digit FDI tooth numbers.
+    "toothseg": {
+        11: "tooth_11", 12: "tooth_12", 13: "tooth_13", 14: "tooth_14",
+        15: "tooth_15", 16: "tooth_16", 17: "tooth_17", 18: "tooth_18",
+        21: "tooth_21", 22: "tooth_22", 23: "tooth_23", 24: "tooth_24",
+        25: "tooth_25", 26: "tooth_26", 27: "tooth_27", 28: "tooth_28",
+        31: "tooth_31", 32: "tooth_32", 33: "tooth_33", 34: "tooth_34",
+        35: "tooth_35", 36: "tooth_36", 37: "tooth_37", 38: "tooth_38",
+        41: "tooth_41", 42: "tooth_42", 43: "tooth_43", 44: "tooth_44",
+        45: "tooth_45", 46: "tooth_46", 47: "tooth_47", 48: "tooth_48",
+    },
 }
+
+# ToothSeg's semantic branch (Dataset121_ToothFairy2_Teeth) outputs 32 ordered
+# FDI tooth-position classes (upper-right quadrant first, then upper-left,
+# lower-left, lower-right), each 8 positions from central incisor to 3rd
+# molar. This is the model's native class order -- toothseg_runner.py needs it
+# to line up per-voxel softmax probabilities (indices 1-32) with FDI numbers.
+TOOTHSEG_SEMANTIC_FDI_ORDER = [
+    11, 12, 13, 14, 15, 16, 17, 18,
+    21, 22, 23, 24, 25, 26, 27, 28,
+    31, 32, 33, 34, 35, 36, 37, 38,
+    41, 42, 43, 44, 45, 46, 47, 48,
+]
 
 # No task in this build requires a commercial license (craniofacial_structures
 # and the "total" rough-crop model are both free). Kept as an empty dict so

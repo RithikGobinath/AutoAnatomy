@@ -121,7 +121,6 @@ class RunProgressScreen(Screen):
                         verbose=True,
                         statistics=app.statistics,
                         remove_small_blobs=app.remove_small_blobs,
-                        robust_crop=app.robust_crop,
                         nr_thr_resamp=app.nr_thr_resamp,
                         nr_thr_saving=app.nr_thr_saving,
                         resampling_order=app.resampling_order,

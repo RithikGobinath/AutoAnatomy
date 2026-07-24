@@ -21,3 +21,7 @@ AutoAnatomy-Portable-*.tar.gz
 # OS
 .DS_Store
 Thumbs.db
+
+# local tooling / build scratch, not part of the source tree
+.claude/
+release_build/
