@@ -38,8 +38,10 @@ Set-Location $root
 # googlemock/scripts/generator), and combined with $root's own path length
 # that reliably exceeds Windows' 260-character MAX_PATH during pip install
 # ("[WinError 206] The filename or extension is too long" -- confirmed by
-# actually hitting it). Building at the drive root leaves enough headroom.
-$buildDir = Join-Path "$env:SystemDrive\" "aa_build"
+# actually hitting it). A short path directly under the user profile leaves
+# enough headroom (the bare drive root works too but some environments
+# restrict operating directly there).
+$buildDir = Join-Path $env:USERPROFILE "_aa_build"
 $stageDir = Join-Path $buildDir "AutoAnatomy"
 $pythonDir = Join-Path $stageDir "python"
 $weightsDir = Join-Path $stageDir ".autoanatomy"
