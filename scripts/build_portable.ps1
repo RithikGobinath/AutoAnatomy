@@ -32,16 +32,19 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-# Deliberately NOT under $root: torch ships license files nested extremely
-# deep (e.g. .../torch-*.dist-info/licenses/third_party/kineto/libkineto/
-# third_party/dynolog/third_party/prometheus-cpp/3rdparty/googletest/
-# googlemock/scripts/generator), and combined with $root's own path length
-# that reliably exceeds Windows' 260-character MAX_PATH during pip install
-# ("[WinError 206] The filename or extension is too long" -- confirmed by
-# actually hitting it). A short path directly under the user profile leaves
-# enough headroom (the bare drive root works too but some environments
-# restrict operating directly there).
-$buildDir = Join-Path $env:USERPROFILE "_aa_build"
+# Deliberately NOT under $root, and deliberately as short as possible:
+# several dependencies ship files nested extremely deep (torch's vendored
+# license files; ToothSeg's own checkpoint folder name, ~93 characters by
+# itself) which combined with $root's own path length reliably exceeds
+# Windows' 260-character MAX_PATH during pip install / weight download
+# ("[WinError 206] The filename or extension is too long" / a bare
+# FileNotFoundError from zipfile -- both confirmed by actually hitting them).
+# Enabling Windows' long-path support fixes this at the OS level, but that
+# needs admin rights (HKLM), which isn't assumed here -- so stay short
+# instead. "_b" (not the bare drive root: some environments restrict
+# operating directly there) leaves enough headroom that "AutoAnatomy" can
+# stay as the staged/shipped folder name.
+$buildDir = Join-Path $env:USERPROFILE "_b"
 $stageDir = Join-Path $buildDir "AutoAnatomy"
 $pythonDir = Join-Path $stageDir "python"
 $weightsDir = Join-Path $stageDir ".autoanatomy"

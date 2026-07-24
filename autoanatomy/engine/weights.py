@@ -189,7 +189,13 @@ def _download_toothseg_weights(config_dir):
 
     print("Downloading ToothSeg model (semantic + instance branches, ~920MB) ...")
     url = "https://zenodo.org/records/14893540/files/ToothSeg.zip"
-    tmp_extract_dir = config_dir / "_toothseg_download_tmp"
+    # Short name deliberately: this checkpoint's own trainer/config folder
+    # (nnUNetTrainer_onlyMirror01_DASegOrd0__nnUNetPlans__3d_fullres_
+    # resample_torch_256_bs8_ctnorm, ~93 characters) plus the rest of a
+    # typical weights-dir path is already close to Windows' 260-character
+    # MAX_PATH -- confirmed by actually hitting it during a real download.
+    # A long temp-folder name here was the difference between fitting and not.
+    tmp_extract_dir = config_dir / "_ts"
     tmp_extract_dir.mkdir(exist_ok=True, parents=True)
     try:
         download_url_and_unpack(url, tmp_extract_dir)
