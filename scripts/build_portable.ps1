@@ -32,7 +32,14 @@ $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$buildDir = Join-Path $root "build\portable"
+# Deliberately NOT under $root: torch ships license files nested extremely
+# deep (e.g. .../torch-*.dist-info/licenses/third_party/kineto/libkineto/
+# third_party/dynolog/third_party/prometheus-cpp/3rdparty/googletest/
+# googlemock/scripts/generator), and combined with $root's own path length
+# that reliably exceeds Windows' 260-character MAX_PATH during pip install
+# ("[WinError 206] The filename or extension is too long" -- confirmed by
+# actually hitting it). Building at the drive root leaves enough headroom.
+$buildDir = Join-Path "$env:SystemDrive\" "aa_build"
 $stageDir = Join-Path $buildDir "AutoAnatomy"
 $pythonDir = Join-Path $stageDir "python"
 $weightsDir = Join-Path $stageDir ".autoanatomy"
