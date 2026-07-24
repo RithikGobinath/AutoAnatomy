@@ -17,15 +17,25 @@ from autoanatomy.engine.class_map import class_map, commercial_models
 
 
 # Selectable tasks, in the order they are offered on the command line.
-# The "total" entry stays in class_map.py only as an internal dependency of
-# the skull-cropping step (see engine/api.py) -- it is deliberately NOT
-# selectable here, since it's infrastructure, not a product task.
+# The "total" entry stays in class_map.py purely as inherited-but-unused
+# infrastructure from upstream (nothing in this build crops to it anymore)
+# -- it is deliberately NOT selectable here, since it's not a product task.
 TASKS = [
     "craniofacial_structures",
     "head_muscles",
     "dental_segmentator",
     "toothseg",
 ]
+
+# task -> the nnU-Net checkpoint task_id(s) it needs downloaded (see
+# engine/weights.py). Used by the CLI's download-weights/check commands so
+# they can't silently drift out of sync with which tasks actually exist.
+TASK_WEIGHT_IDS = {
+    "craniofacial_structures": [115],
+    "head_muscles": [777],
+    "dental_segmentator": [112],
+    "toothseg": [121, 123],
+}
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
 # surfaced in the TUI's roadmap panel as "coming soon". ("teeth" is no longer

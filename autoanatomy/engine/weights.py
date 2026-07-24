@@ -104,6 +104,22 @@ def download_url_and_unpack(url, config_dir):
             os.remove(tempfile)
 
 
+# task_id -> the folder name it unpacks to under the weights dir. Shared by
+# download_pretrained_weights (below) and cli.main's download-weights/check
+# commands, so cache-status reporting can't drift out of sync with what
+# actually gets downloaded.
+WEIGHTS_FOLDER_NAMES = {
+    297: "Dataset297_TotalSegmentator_total_3mm_1559subj",
+    298: "Dataset298_TotalSegmentator_total_6mm_1559subj",
+    294: "Dataset294_TotalSegmentator_part4_muscles_1559subj",
+    115: "Dataset115_mandible",
+    777: "Dataset777_head_muscles_492subj",
+    112: "Dataset112_DentalSegmentator_v100",
+    121: "Dataset121_ToothFairy2_Teeth",
+    123: "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px",
+}
+
+
 def download_pretrained_weights(task_id):
 
     config_dir = get_weights_dir()

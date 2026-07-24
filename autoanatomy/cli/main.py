@@ -156,19 +156,19 @@ def cmd_check(args):
 
     import shutil
     from autoanatomy.engine.config import get_totalseg_dir, get_weights_dir
+    from autoanatomy.engine.registry import TASK_WEIGHT_IDS
+    from autoanatomy.engine.weights import WEIGHTS_FOLDER_NAMES
 
     home_dir = get_totalseg_dir()
     weights_dir = get_weights_dir()
     print(f"home dir:       {home_dir}")
     print(f"weights dir:    {weights_dir}")
 
-    craniofacial_cached = (weights_dir / "Dataset115_mandible").exists()
-    head_muscles_cached = (weights_dir / "Dataset777_head_muscles_492subj").exists()
-    crop_model_cached = (weights_dir / "Dataset298_TotalSegmentator_total_6mm_1559subj").exists()
-    print(
-        f"weights cached: craniofacial_structures={craniofacial_cached}  "
-        f"head_muscles={head_muscles_cached}  crop-model={crop_model_cached}"
-    )
+    cached = {
+        task: all((weights_dir / WEIGHTS_FOLDER_NAMES[tid]).exists() for tid in task_ids)
+        for task, task_ids in TASK_WEIGHT_IDS.items()
+    }
+    print("weights cached: " + "  ".join(f"{task}={cached[task]}" for task in TASKS))
 
     total, used, free = shutil.disk_usage(home_dir.anchor or "/")
     print(f"disk free:      {free / 1e9:.1f} GB / {total / 1e9:.1f} GB")
@@ -177,13 +177,12 @@ def cmd_check(args):
 
 def cmd_download_weights(args):
     from autoanatomy.engine.weights import download_pretrained_weights
+    from autoanatomy.engine.registry import TASK_WEIGHT_IDS
 
-    print("Downloading craniofacial_structures model (task 115)...")
-    download_pretrained_weights(115)
-    print("Downloading head_muscles model (task 777)...")
-    download_pretrained_weights(777)
-    print("Downloading rough skull-cropping model (task 298)...")
-    download_pretrained_weights(298)
+    for task in TASKS:
+        for task_id in TASK_WEIGHT_IDS[task]:
+            print(f"Downloading {task} model (task {task_id})...")
+            download_pretrained_weights(task_id)
     print("Done.")
     return 0
 
