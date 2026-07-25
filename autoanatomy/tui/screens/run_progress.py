@@ -118,6 +118,7 @@ class RunProgressScreen(Screen):
                 nr_thr_resamp=app.nr_thr_resamp,
                 nr_thr_saving=app.nr_thr_saving,
                 resampling_order=app.resampling_order,
+                low_memory=app.low_memory,
             )
 
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)

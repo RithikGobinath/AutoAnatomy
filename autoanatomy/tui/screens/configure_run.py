@@ -91,6 +91,18 @@ class ConfigureRunScreen(Screen):
                     "spare.[/dim]"
                 )
 
+                yield Checkbox(
+                    "Low memory mode (slower -- avoids a real out-of-memory crash)",
+                    id="low-memory-checkbox",
+                )
+                yield Static(
+                    "  [dim]Runs prediction and export one case at a time in this process instead of "
+                    "handing the result to a background worker process -- that hand-off needs a full "
+                    "extra copy of the result in memory, which can fail on its own for a high-resolution "
+                    "scan even when the prediction itself succeeded. Try this if a run fails with "
+                    "MemoryError.[/dim]"
+                )
+
             with Vertical():
                 yield Button("Run Segmentation", id="run-btn", variant="primary")
                 yield Button("Back", id="back-btn")
@@ -173,6 +185,7 @@ class ConfigureRunScreen(Screen):
         self.app.parallel_tasks = self.query_one("#parallel-tasks-checkbox", Checkbox).value
         max_parallel = self._num("max-parallel-tasks-input", int, DEFAULT_MAX_PARALLEL_TASKS)
         self.app.max_parallel_tasks = max(1, max_parallel)
+        self.app.low_memory = self.query_one("#low-memory-checkbox", Checkbox).value
 
         from autoanatomy.tui.screens.run_progress import RunProgressScreen
         self.app.push_screen(RunProgressScreen())

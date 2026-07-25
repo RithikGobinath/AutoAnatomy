@@ -37,6 +37,14 @@ class AutoAnatomyApp(App):
     nr_thr_resamp: int = 1
     nr_thr_saving: int = 6
     resampling_order: int = 3
+    # Off by default -- see engine/nnunet_runner.py's low_memory branch.
+    # Sending a prediction to the normal background export pool means
+    # pickling a full copy of it to hand to a worker process; for a
+    # high-resolution volume that copy alone can raise a bare MemoryError on
+    # Windows even when the prediction itself succeeded. This runs export
+    # synchronously in the same process instead -- slower, but avoids that
+    # failure mode entirely rather than just making it less likely.
+    low_memory: bool = False
     # Off by default -- running more than one task at once means every
     # task's model is loaded into memory (and, on GPU, VRAM) simultaneously
     # instead of one at a time.

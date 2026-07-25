@@ -22,6 +22,8 @@ def _args(**overrides):
         saving_threads=6,
         resampling_order=3,
         parallel_tasks=False,
+        max_parallel_tasks=None,
+        low_memory=False,
     )
     for k, v in overrides.items():
         setattr(ns, k, v)

@@ -241,7 +241,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                      robust_crop=False, higher_order_resampling_LEGACY=False, higher_order_resampling=False,
                      save_probabilities=None,
                      debug=False, report=None, statistics_extra=False, save_lowres=False, resampling_order=3,
-                     plans="nnUNetPlans", model_size="big"):
+                     plans="nnUNetPlans", model_size="big", low_memory=False):
     """
     Run AutoAnatomy's segmentation pipeline from within python.
 
@@ -488,14 +488,14 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                                 save_binary=False, nr_threads_resampling=nr_thr_resamp, nr_threads_saving=1,
                                 crop_addon=None, output_type=output_type, statistics=False,
                                 quiet=quiet, verbose=verbose, test=0, skip_saving=False, device=device,
-                                debug=debug, resampling_order=resampling_order)
+                                debug=debug, resampling_order=resampling_order, low_memory=low_memory)
             class_map_inv = {v: k for k, v in class_map[crop_task].items()}
             
         else:
             # If crop_model is specified, run segment() again for the crop model
             organ_seg = segment(input, None, task=crop_model, nr_thr_resamp=nr_thr_resamp,
                                          device=convert_device_to_string(device), quiet=quiet, verbose=verbose,
-                                         resampling_order=resampling_order)
+                                         resampling_order=resampling_order, low_memory=low_memory)
             class_map_inv = {v: k for k, v in class_map[crop_model].items()}
 
         crop_mask = np.zeros(organ_seg.shape, dtype=np.uint8)
@@ -528,7 +528,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                             save_binary=True, nr_threads_resampling=nr_thr_resamp, nr_threads_saving=1,
                             crop_addon=crop_addon, output_type=output_type, statistics=False,
                             quiet=quiet, verbose=verbose, test=0, skip_saving=False, device=device,
-                            debug=debug, resampling_order=resampling_order)
+                            debug=debug, resampling_order=resampling_order, low_memory=low_memory)
         crop = body_seg
         if verbose: print(f"Rough body segmentation generated in {time.time()-st:.2f}s")
 
@@ -543,7 +543,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                             crop_addon=crop_addon, output_type="nifti", statistics=False,
                             quiet=quiet, verbose=verbose, test=0, skip_saving=False, device=device,
                             debug=debug, resampling_order=resampling_order,
-                            use_cropped_logits_resampling=higher_order_resampling)
+                            use_cropped_logits_resampling=higher_order_resampling, low_memory=low_memory)
         if verbose: print(f"Vertebrae body mask generated in {time.time()-st:.2f}s")
 
     prediction_task = "vertebrae_pp" if task == "vertebrae_pp_refined" else task
@@ -564,7 +564,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                             debug=debug, save_lowres=save_lowres and (fast or fastest),
                             resampling_order=resampling_order, plans=plans,
                             vertebrae_body_mask=vertebrae_body_mask, output_task_name=task,
-                            use_cropped_logits_resampling=higher_order_resampling)
+                            use_cropped_logits_resampling=higher_order_resampling, low_memory=low_memory)
     seg = seg_img.get_fdata().astype(np.uint8)
 
     try:

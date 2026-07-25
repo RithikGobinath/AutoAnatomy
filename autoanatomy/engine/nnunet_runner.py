@@ -216,7 +216,8 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
                      trainer="nnUNetTrainer", tta=False,
                      num_threads_preprocessing=3, num_threads_nifti_save=2,
                      plans="nnUNetPlans", device="cuda", quiet=False, step_size=0.5,
-                     save_probabilities_path=None, use_cropped_logits_resampling=False):
+                     save_probabilities_path=None, use_cropped_logits_resampling=False,
+                     low_memory=False):
     """
     Identical to bash function nnUNetv2_predict
     """
@@ -309,17 +310,36 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
         use_folds=folds,
         checkpoint_name=chk,
     )
-    # new nnunetv2 feature: keep dir_out empty to return predictions as return value
-    predict_kwargs = {}
-    if (use_cropped_logits_resampling and not save_probabilities
-            and supports_keyword_argument(predictor.predict_from_files, "use_cropped_logits_resampling")):
-        predict_kwargs["use_cropped_logits_resampling"] = True
-    predictor.predict_from_files(dir_in, dir_out,
-                                 save_probabilities=save_probabilities, overwrite=not continue_prediction,
-                                 num_processes_preprocessing=npp, num_processes_segmentation_export=nps,
-                                 folder_with_segs_from_prev_stage=prev_stage_predictions,
-                                 num_parts=num_parts, part_id=part_id,
-                                 **predict_kwargs)
+    if low_memory:
+        # Runs prediction + export in this same process, one case at a time --
+        # no background multiprocessing.Pool, so no worker process to send the
+        # (potentially huge) predicted-logits array to. That send is a real,
+        # confirmed OOM path on Windows: sending an object to a spawned worker
+        # means pickling a full serialized copy of it first, and for a
+        # high-resolution volume that copy alone can exceed available RAM --
+        # observed as a bare MemoryError inside
+        # multiprocessing/reduction.py's ForkingPickler.dumps, not anything
+        # inference-related. Slower (no overlap between GPU prediction and
+        # CPU-side export of the previous case), but avoids that failure mode
+        # entirely rather than just making it less likely.
+        predictor.predict_from_files_sequential(
+            dir_in, dir_out,
+            save_probabilities=save_probabilities, overwrite=not continue_prediction,
+            folder_with_segs_from_prev_stage=prev_stage_predictions,
+            use_cropped_logits_resampling=use_cropped_logits_resampling and not save_probabilities,
+        )
+    else:
+        # new nnunetv2 feature: keep dir_out empty to return predictions as return value
+        predict_kwargs = {}
+        if (use_cropped_logits_resampling and not save_probabilities
+                and supports_keyword_argument(predictor.predict_from_files, "use_cropped_logits_resampling")):
+            predict_kwargs["use_cropped_logits_resampling"] = True
+        predictor.predict_from_files(dir_in, dir_out,
+                                     save_probabilities=save_probabilities, overwrite=not continue_prediction,
+                                     num_processes_preprocessing=npp, num_processes_segmentation_export=nps,
+                                     folder_with_segs_from_prev_stage=prev_stage_predictions,
+                                     num_parts=num_parts, part_id=part_id,
+                                     **predict_kwargs)
 
     if save_probabilities:
         shutil.copy(Path(dir_out) / "s01.npz", save_probabilities_path)
@@ -367,7 +387,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                          normalized_intensities=False, higher_order_resampling_LEGACY=False,
                          save_probabilities=None, cascade=None, remove_outside_mask=None, remove_outside_dilation=None,
                          debug=False, save_lowres=False, resampling_order=3, plans="nnUNetPlans",
-                         vertebrae_body_mask=None, output_task_name=None, use_cropped_logits_resampling=False):
+                         vertebrae_body_mask=None, output_task_name=None, use_cropped_logits_resampling=False,
+                         low_memory=False):
     """
     crop: string or a nibabel image
     resample: None or float (target spacing for all dimensions) or list of floats
@@ -616,7 +637,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                                              nr_threads_resampling, nr_threads_saving,
                                              plans=plans, device=device, quiet=quiet, step_size=step_size,
                                              save_probabilities_path=save_probabilities,
-                                             use_cropped_logits_resampling=use_cropped_logits_resampling)
+                                             use_cropped_logits_resampling=use_cropped_logits_resampling,
+                                             low_memory=low_memory)
                     except Exception as e:
                         if debug:
                             print(f"Error during prediction for input: {file_in}, task: {task_name}, task_id: {tid}, part: {idx+1}/{len(task_id)}")
@@ -654,7 +676,8 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                                          nr_threads_resampling, nr_threads_saving,
                                          plans=plans, device=device, quiet=quiet, step_size=step_size,
                                          save_probabilities_path=save_probabilities,
-                                         use_cropped_logits_resampling=use_cropped_logits_resampling)
+                                         use_cropped_logits_resampling=use_cropped_logits_resampling,
+                                         low_memory=low_memory)
                 except Exception as e:
                     if debug:
                         print(f"Error during prediction for input: {file_in}, task: {task_name}, task_id: {task_id}")

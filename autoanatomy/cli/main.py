@@ -94,6 +94,7 @@ def cmd_segment(args):
             nr_thr_saving=args.saving_threads,
             resampling_order=args.resampling_order,
             roi_subset=roi_subset,
+            low_memory=args.low_memory,
         )
 
     if args.parallel_tasks and multi_task:
@@ -238,6 +239,13 @@ def build_parser():
                         help="Threads used for writing output files (default: 6)")
     p_seg.add_argument("--resampling-order", type=resampling_order, default=3, metavar="0-5",
                         help="Interpolation order for resampling -- higher is smoother but slower (default: 3)")
+    p_seg.add_argument("--low-memory", action="store_true",
+                        help="Run prediction and export one case at a time in this same process instead of "
+                             "handing the predicted array off to a background multiprocessing pool. Slower (no "
+                             "overlap between GPU prediction and CPU-side export), but avoids a real failure "
+                             "mode on Windows: sending a large array to a worker process means pickling a full "
+                             "copy of it first, which can raise MemoryError on its own for a high-resolution "
+                             "volume even when the prediction itself succeeded.")
     p_seg.set_defaults(func=cmd_segment)
 
     p_list = sub.add_parser("list-structures", help="List the structures this build can segment")
