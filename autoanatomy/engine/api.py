@@ -19,7 +19,7 @@ from autoanatomy.engine.class_map import class_map
 import re
 
 
-def release_task_memory():
+def release_task_memory(quiet=False):
     """Call between sequential segment() runs in the same process (multiple
     tasks selected, --parallel-tasks off).
 
@@ -43,6 +43,9 @@ def release_task_memory():
         # is actually done before reclaiming.
         torch.cuda.synchronize()
         torch.cuda.empty_cache()
+        if not quiet:
+            free_bytes, total_bytes = torch.cuda.mem_get_info()
+            print(f"  VRAM free after cleanup: {free_bytes / 1e9:.2f} / {total_bytes / 1e9:.2f} GB")
 
 
 def validate_device_type_api(value):

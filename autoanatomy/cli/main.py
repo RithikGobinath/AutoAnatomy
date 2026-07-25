@@ -127,7 +127,7 @@ def cmd_segment(args):
     else:
         for task, roi_subset in run_plan.items():
             segment(**_task_kwargs(task, roi_subset))
-            release_task_memory()
+            release_task_memory(quiet=args.quiet)
     return 0
 
 
