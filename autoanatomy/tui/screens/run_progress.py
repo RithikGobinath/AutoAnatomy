@@ -86,7 +86,7 @@ class RunProgressScreen(Screen):
 
     @work(thread=True)
     def run_segmentation(self) -> None:
-        from autoanatomy.engine.api import segment
+        from autoanatomy.engine.api import segment, release_task_memory
 
         app = self.app
         tasks = list(app.selected_tasks)
@@ -148,6 +148,7 @@ class RunProgressScreen(Screen):
                         if multi_task:
                             app.call_from_thread(self.log_line, f"=== Running {i + 1}/{len(tasks)}: {task} ===")
                         segment(**_task_kwargs(task))
+                        release_task_memory()
             if app.statistics:
                 # Only meaningful for the last task run when --ml is used across
                 # multiple tasks (each writes its own statistics.json into the

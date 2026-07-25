@@ -31,7 +31,7 @@ def _ml_output_path(output, task, multi_task):
 def cmd_segment(args):
     # Imported lazily: this pulls in torch/nnunetv2, which is slow and
     # unnecessary for --list-structures / check / download-weights.
-    from autoanatomy.engine.api import segment, validate_device_type_api
+    from autoanatomy.engine.api import segment, validate_device_type_api, release_task_memory
 
     try:
         validate_device_type_api(args.device)
@@ -126,6 +126,7 @@ def cmd_segment(args):
     else:
         for task, roi_subset in run_plan.items():
             segment(**_task_kwargs(task, roi_subset))
+            release_task_memory()
     return 0
 
 

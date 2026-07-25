@@ -1,5 +1,6 @@
 import sys
 import os
+import gc
 import json
 import importlib.metadata
 from pathlib import Path
@@ -16,6 +17,27 @@ from autoanatomy.engine.weights import download_pretrained_weights
 from autoanatomy.engine.config import setup_nnunet, setup_totalseg, increase_prediction_counter
 from autoanatomy.engine.class_map import class_map
 import re
+
+
+def release_task_memory():
+    """Call between sequential segment() runs in the same process (multiple
+    tasks selected, --parallel-tasks off).
+
+    Each task's nnU-Net predictor, resampled volumes, and (for toothseg) a
+    several-GB probability array are only local variables inside the
+    functions that made them -- Python's own refcounting frees them as soon
+    as those functions return, without any help. But a long-lived process
+    running through several such tasks back to back can still accumulate
+    real peak memory: reference cycles (torch/nnU-Net internals do have
+    some) only get collected by the cyclic GC, not plain refcounting, and
+    CUDA's caching allocator holds freed GPU memory for reuse rather than
+    returning it, which torch.cuda.memory_allocated() reports as still "in
+    use". Neither of those is a leak exactly, but both mean the next task
+    starts with more already-committed memory than it needs to.
+    """
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 def validate_device_type_api(value):
