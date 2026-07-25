@@ -37,6 +37,11 @@ def release_task_memory():
     """
     gc.collect()
     if torch.cuda.is_available():
+        # Without this, empty_cache() can run while CUDA ops from the task
+        # that just finished are still queued asynchronously, so it frees
+        # less than it could -- synchronize first to make sure everything
+        # is actually done before reclaiming.
+        torch.cuda.synchronize()
         torch.cuda.empty_cache()
 
 
@@ -149,7 +154,8 @@ def build_run_report(input, output, task, device, fast, fastest, ml, output_type
 
 def _run_toothseg_task(input, output, ml, roi_subset, device, nr_thr_resamp, quiet, verbose,
                        statistics, stats_aggregation, statistics_exclude_masks_at_border,
-                       statistics_normalized_intensities, statistics_extra, remove_small_blobs):
+                       statistics_normalized_intensities, statistics_extra, remove_small_blobs,
+                       low_memory=False):
     """Run the "toothseg" task end to end: inference (toothseg_runner), then
     the same roi_subset filtering / saving / statistics conventions every
     other AutoAnatomy task follows, so it's a drop-in alternative to the
@@ -178,7 +184,7 @@ def _run_toothseg_task(input, output, ml, roi_subset, device, nr_thr_resamp, qui
                 img_in = nib.load(tmp_dir / "dcm" / "converted.nii.gz")
 
     seg_img = run_toothseg(img_in, device=device, nr_threads_resampling=nr_thr_resamp,
-                           quiet=quiet, verbose=verbose)
+                           quiet=quiet, verbose=verbose, low_memory=low_memory)
 
     seg_data = np.asarray(seg_img.dataobj).astype(np.uint8)
     if roi_subset is not None:
@@ -311,6 +317,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
             statistics_exclude_masks_at_border=statistics_exclude_masks_at_border,
             statistics_normalized_intensities=statistics_normalized_intensities,
             statistics_extra=statistics_extra, remove_small_blobs=remove_small_blobs,
+            low_memory=low_memory,
         )
 
     from autoanatomy.engine.nnunet_runner import nnUNet_predict_image  # this has to be after setting new env vars

@@ -97,10 +97,10 @@ class ConfigureRunScreen(Screen):
                 )
                 yield Static(
                     "  [dim]Runs prediction and export one case at a time in this process instead of "
-                    "handing the result to a background worker process -- that hand-off needs a full "
-                    "extra copy of the result in memory, which can fail on its own for a high-resolution "
-                    "scan even when the prediction itself succeeded. Try this if a run fails with "
-                    "MemoryError.[/dim]"
+                    "handing the result to a background worker process, and skips nnU-Net's own "
+                    "pinned-memory preprocessing pipeline -- both can fail on their own for a "
+                    "high-resolution scan even when the prediction itself succeeded. Try this if a run "
+                    "fails with MemoryError or a CUDA out-of-memory error.[/dim]"
                 )
 
             with Vertical():

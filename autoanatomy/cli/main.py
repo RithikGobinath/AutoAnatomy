@@ -241,11 +241,14 @@ def build_parser():
                         help="Interpolation order for resampling -- higher is smoother but slower (default: 3)")
     p_seg.add_argument("--low-memory", action="store_true",
                         help="Run prediction and export one case at a time in this same process instead of "
-                             "handing the predicted array off to a background multiprocessing pool. Slower (no "
-                             "overlap between GPU prediction and CPU-side export), but avoids a real failure "
-                             "mode on Windows: sending a large array to a worker process means pickling a full "
-                             "copy of it first, which can raise MemoryError on its own for a high-resolution "
-                             "volume even when the prediction itself succeeded.")
+                             "handing the predicted array off to a background multiprocessing pool, and skip "
+                             "nnU-Net's own pinned-memory preprocessing pipeline. Slower (no overlap between "
+                             "GPU prediction and CPU-side export), but avoids two real failure modes: sending a "
+                             "large array to a worker process means pickling a full copy of it first, which can "
+                             "raise MemoryError on its own for a high-resolution volume even when the "
+                             "prediction itself succeeded; and pinned-memory allocation for the background "
+                             "preprocessing loader can raise a CUDA out-of-memory error even when there's VRAM "
+                             "free for the model itself.")
     p_seg.set_defaults(func=cmd_segment)
 
     p_list = sub.add_parser("list-structures", help="List the structures this build can segment")

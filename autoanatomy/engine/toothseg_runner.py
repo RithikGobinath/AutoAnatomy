@@ -52,7 +52,7 @@ _SMALL_CENTER_THRESHOLD_MM3 = 16
 _ISOLATED_BORDER_THRESHOLD_MM3 = 0
 
 
-def _run_branch(img_in: Nifti1Image, task_id, trainer, config, fold, device, quiet):
+def _run_branch(img_in: Nifti1Image, task_id, trainer, config, fold, device, quiet, low_memory=False):
     """Run one ToothSeg nnU-Net branch on an in-memory image via the standard
     file-based nnU-Net pipeline (resamples back to img_in's own resolution).
 
@@ -81,7 +81,7 @@ def _run_branch(img_in: Nifti1Image, task_id, trainer, config, fold, device, qui
         nnUNetv2_predict(
             dir_in, dir_out, task_id, model=config, folds=[fold], trainer=trainer,
             tta=False, plans="nnUNetPlans", device=device, quiet=quiet,
-            num_threads_nifti_save=1,
+            num_threads_nifti_save=1, low_memory=low_memory,
         )
 
         seg_img = nib.load(str(dir_out / "s01.nii.gz"))
@@ -396,6 +396,7 @@ def run_toothseg(
     nr_threads_resampling=1,
     quiet=False,
     verbose=False,
+    low_memory=False,
 ):
     """Run the full ToothSeg pipeline on an already-loaded, already-oriented
     CT image. Returns a Nifti1Image whose voxel values are FDI tooth numbers
@@ -404,6 +405,7 @@ def run_toothseg(
         print("Running ToothSeg instance branch (border/core)...")
     instance_border_core, instance_affine = _run_branch(
         input_img, INSTANCE_TASK_ID, INSTANCE_TRAINER, INSTANCE_CONFIG, INSTANCE_FOLD, device, quiet,
+        low_memory=low_memory,
     )
 
     if not quiet:
