@@ -118,6 +118,7 @@ def cmd_segment(args):
             run_tasks_concurrently(
                 [_task_kwargs(task, roi_subset) for task, roi_subset in run_plan.items()],
                 on_task_done=_on_done,
+                max_workers=args.max_parallel_tasks,
             )
         except RuntimeError as e:
             print(f"error: {e}", file=sys.stderr)
@@ -214,9 +215,15 @@ def build_parser():
     p_seg.add_argument("--ml", action="store_true", help="Write a single multilabel NIfTI instead of one file per structure")
     p_seg.add_argument("--device", default="gpu", help="gpu | cpu | mps | gpu:X (default: gpu)")
     p_seg.add_argument("--parallel-tasks", action="store_true",
-                        help="With more than one -ta task, run them all at once (each in its own process) "
-                             "instead of one after another. Faster when you have CPU/RAM (or VRAM) headroom "
-                             "to spare, since every task's model is loaded into memory at the same time.")
+                        help="With more than one -ta task, run up to --max-parallel-tasks of them at once "
+                             "(each in its own process) instead of strictly one after another. Faster when you "
+                             "have CPU/RAM (or VRAM) headroom to spare, since each concurrent task's model is "
+                             "loaded into memory at the same time.")
+    p_seg.add_argument("--max-parallel-tasks", type=int, default=None, metavar="N",
+                        help="With --parallel-tasks, cap how many tasks run at once (default: 2). Each one "
+                             "loads its own full copy of the model + scan into memory, so raise this only if "
+                             "you have the RAM/VRAM to spare -- an uncapped run is what causes out-of-memory "
+                             "crashes with several tasks selected.")
     p_seg.add_argument("-q", "--quiet", action="store_true")
     p_seg.add_argument("-v", "--verbose", action="store_true")
 

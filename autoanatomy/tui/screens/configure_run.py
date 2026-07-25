@@ -9,6 +9,7 @@ from textual.widgets import (
 )
 
 from autoanatomy.engine.class_map import class_map
+from autoanatomy.engine.parallel_runner import DEFAULT_MAX_PARALLEL_TASKS
 from autoanatomy.engine.registry import TASKS
 
 DEFAULT_BLOB_THRESHOLD_MM3 = 200
@@ -80,6 +81,14 @@ class ConfigureRunScreen(Screen):
                     "Run tasks in parallel (faster with multiple tasks selected -- "
                     "uses more RAM/VRAM at once)",
                     id="parallel-tasks-checkbox",
+                )
+                with Horizontal(classes="advanced-row"):
+                    yield Static("  Max parallel tasks:", classes="hint")
+                    yield Input(value=str(DEFAULT_MAX_PARALLEL_TASKS), id="max-parallel-tasks-input", type="integer")
+                yield Static(
+                    "  [dim]Each concurrent task loads its own full model + scan copy into memory -- "
+                    "raising this can cause an out-of-memory crash if you don't have the RAM/VRAM to "
+                    "spare.[/dim]"
                 )
 
             with Vertical():
@@ -162,6 +171,8 @@ class ConfigureRunScreen(Screen):
         order = self._num("resampling-order-input", int, DEFAULT_RESAMPLING_ORDER)
         self.app.resampling_order = min(5, max(0, order))
         self.app.parallel_tasks = self.query_one("#parallel-tasks-checkbox", Checkbox).value
+        max_parallel = self._num("max-parallel-tasks-input", int, DEFAULT_MAX_PARALLEL_TASKS)
+        self.app.max_parallel_tasks = max(1, max_parallel)
 
         from autoanatomy.tui.screens.run_progress import RunProgressScreen
         self.app.push_screen(RunProgressScreen())

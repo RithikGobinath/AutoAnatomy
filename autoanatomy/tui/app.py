@@ -41,6 +41,11 @@ class AutoAnatomyApp(App):
     # task's model is loaded into memory (and, on GPU, VRAM) simultaneously
     # instead of one at a time.
     parallel_tasks: bool = False
+    # Caps how many of those run truly simultaneously when parallel_tasks is
+    # on (see engine/parallel_runner.py's DEFAULT_MAX_PARALLEL_TASKS) -- an
+    # uncapped run is what causes real out-of-memory crashes with several
+    # tasks selected, since each one loads its own full model + scan copy.
+    max_parallel_tasks: int | None = None
     statistics_path: Path | None = None
 
     def on_mount(self) -> None:

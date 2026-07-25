@@ -36,9 +36,22 @@ def _run_one_task(kwargs: dict) -> tuple:
     return task_name, buf.getvalue(), error
 
 
-def run_tasks_concurrently(task_kwargs_list: list, on_task_done=None):
-    """Run segment(**kwargs) for each kwargs dict in task_kwargs_list in its
-    own process, concurrently.
+# Unbounded (one process per selected task, all launched at once) is how
+# this used to run and is a real way to exhaust system RAM: every worker
+# loads its own full copy of torch + nnU-Net + the input scan into memory
+# simultaneously, with no relationship to how much RAM is actually free.
+# Default to a conservative cap rather than "as many as you selected" --
+# still faster than fully sequential for most task counts, but bounded.
+DEFAULT_MAX_PARALLEL_TASKS = 2
+
+
+def run_tasks_concurrently(task_kwargs_list: list, on_task_done=None, max_workers=None):
+    """Run segment(**kwargs) for each kwargs dict in task_kwargs_list, up to
+    max_workers at once (each in its own process), queueing the rest.
+
+    max_workers=None uses DEFAULT_MAX_PARALLEL_TASKS. Pass an explicit int
+    (e.g. len(task_kwargs_list), to fully restore the old unbounded
+    behavior) if you know you have the RAM/VRAM for it.
 
     on_task_done(task_name, captured_output, error_or_none), if given, is
     called as each task finishes -- in completion order, not submission
@@ -47,9 +60,13 @@ def run_tasks_concurrently(task_kwargs_list: list, on_task_done=None):
     Raises RuntimeError listing every task that failed, once all tasks (not
     just the first failure) have had a chance to finish.
     """
+    if max_workers is None:
+        max_workers = DEFAULT_MAX_PARALLEL_TASKS
+    max_workers = max(1, min(max_workers, len(task_kwargs_list)))
+
     ctx = multiprocessing.get_context("spawn")
     failures = []
-    with ProcessPoolExecutor(max_workers=len(task_kwargs_list), mp_context=ctx) as executor:
+    with ProcessPoolExecutor(max_workers=max_workers, mp_context=ctx) as executor:
         futures = [executor.submit(_run_one_task, kwargs) for kwargs in task_kwargs_list]
         for future in as_completed(futures):
             task_name, output, error = future.result()

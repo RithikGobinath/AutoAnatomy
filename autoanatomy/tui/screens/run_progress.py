@@ -138,7 +138,11 @@ class RunProgressScreen(Screen):
                         if error:
                             app.call_from_thread(self.log_line, f"error: {error}")
 
-                    run_tasks_concurrently([_task_kwargs(t) for t in tasks], on_task_done=_on_task_done)
+                    run_tasks_concurrently(
+                        [_task_kwargs(t) for t in tasks],
+                        on_task_done=_on_task_done,
+                        max_workers=app.max_parallel_tasks,
+                    )
                 else:
                     for i, task in enumerate(tasks):
                         if multi_task:
