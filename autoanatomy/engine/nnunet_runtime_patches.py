@@ -2,7 +2,7 @@ import inspect
 import os
 import warnings
 from copy import deepcopy
-from time import sleep
+from time import sleep, perf_counter
 from typing import Callable, Union
 
 import numpy as np
@@ -316,7 +316,14 @@ def predict_from_data_iterator(self,
     with prd.multiprocessing.get_context("spawn").Pool(num_processes_segmentation_export) as export_pool:
         worker_list = [i for i in export_pool._pool]
         r = []
+        # Measures wall-clock until the iterator yields its first case -- the
+        # iterator preprocesses lazily on __next__, so this brackets real
+        # preprocessing time (for AutoAnatomy's always-one-case runs, this is
+        # the only case there is, so no later case's preprocessing can
+        # overlap with this one's prediction to make the number misleading).
+        t0 = perf_counter()
         for preprocessed in data_iterator:
+            print(f"  Preprocessing: {perf_counter() - t0:.2f}s")
             data = preprocessed["data"]
             if isinstance(data, str):
                 delfile = data
@@ -337,7 +344,9 @@ def predict_from_data_iterator(self,
                 sleep(0.1)
                 proceed = not prd.check_workers_alive_and_busy(export_pool, worker_list, r, allowed_num_queued=2)
 
+            t0 = perf_counter()
             prediction = self.predict_logits_from_preprocessed_data(data).cpu().detach().numpy()
+            print(f"  Prediction (sliding window + TTA, all tiles): {perf_counter() - t0:.2f}s")
 
             if ofile is not None:
                 print("sending off prediction to background worker for resampling and export")
@@ -362,8 +371,13 @@ def predict_from_data_iterator(self,
                 print(f"done with {os.path.basename(ofile)}")
             else:
                 print(f"\nDone with image of shape {data.shape}:")
+            # Reset for the next case's preprocessing (irrelevant for
+            # AutoAnatomy's always-one-case runs, kept for fidelity if this
+            # is ever reused with a real multi-case batch).
+            t0 = perf_counter()
 
         print("GPU prediction completed. Waiting for remaining segmentation exports to finish...")
+        t0 = perf_counter()
         ret = [None] * len(r)
         with prd.tqdm(desc="Collecting results", total=len(r), disable=not self.allow_tqdm) as pbar:
             for i, result in enumerate(r):
@@ -378,6 +392,7 @@ def predict_from_data_iterator(self,
                     except prd.multiprocessing.TimeoutError:
                         pass
                 pbar.update()
+        print(f"  Export/resampling (background worker, includes any wait): {perf_counter() - t0:.2f}s")
         print("Segmentation export complete.")
 
     if isinstance(data_iterator, prd.MultiThreadedAugmenter):
@@ -508,6 +523,7 @@ def predict_from_files_sequential(self,
 
     ret = []
     for li, of, sps in zip(list_of_lists_or_source_folder, output_filename_truncated, seg_from_prev_stage_files):
+        t0 = perf_counter()
         data, seg, data_properties = preprocessor.run_case(
             li,
             sps,
@@ -518,11 +534,15 @@ def predict_from_files_sequential(self,
         if folder_with_segs_from_prev_stage is not None:
             seg_onehot = prd.convert_labelmap_to_one_hot(seg[0], label_manager.foreground_labels, data.dtype)
             data = np.vstack((data, seg_onehot))
+        print(f"  Preprocessing: {perf_counter() - t0:.2f}s")
 
         print(f"perform_everything_on_device: {self.perform_everything_on_device}")
 
+        t0 = perf_counter()
         prediction = self.predict_logits_from_preprocessed_data(torch.from_numpy(data)).cpu()
+        print(f"  Prediction (sliding window + TTA, all tiles): {perf_counter() - t0:.2f}s")
 
+        t0 = perf_counter()
         if of is not None:
             export_prediction_from_logits(
                 prediction, data_properties, self.configuration_manager, self.plans_manager,
@@ -537,6 +557,7 @@ def predict_from_files_sequential(self,
                     use_cropped_logits_resampling=use_cropped_logits_resampling
                 )
             )
+        print(f"  Export/resampling: {perf_counter() - t0:.2f}s")
 
     prd.compute_gaussian.cache_clear()
     prd.empty_cache(self.device)
