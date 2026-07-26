@@ -9,7 +9,7 @@ from textual import work
 from textual.app import ComposeResult
 from textual.containers import Vertical
 from textual.screen import Screen
-from textual.widgets import Button, Footer, Header, RichLog, Static
+from textual.widgets import Button, Footer, Header, ProgressBar, RichLog, Static
 
 # Full-resolution real CT scans can need several GB of scratch space for
 # resampled/cropped intermediates (a 0.5mm isotropic crop of a real head CT
@@ -74,6 +74,8 @@ class RunProgressScreen(Screen):
                 "skull-cropping model — this can take a while.",
                 classes="hint",
             )
+            yield Static("", id="progress-phase", classes="hint")
+            yield ProgressBar(id="task-progress", show_eta=True)
             yield RichLog(id="progress-log", wrap=True, highlight=False)
             yield Button("Back to Home", id="back-btn", disabled=True)
         yield Footer()
@@ -84,9 +86,25 @@ class RunProgressScreen(Screen):
     def log_line(self, line: str) -> None:
         self.query_one("#progress-log", RichLog).write(line)
 
+    def _reset_progress(self, phase: str) -> None:
+        self.query_one("#progress-phase", Static).update(phase)
+        self.query_one("#task-progress", ProgressBar).update(total=None, progress=0)
+
+    def _on_progress(self, completed: int, total: int, desc: str | None) -> None:
+        bar = self.query_one("#task-progress", ProgressBar)
+        # desc is nnU-Net's own tqdm description ("Collecting results" for the
+        # background export step; None for the main per-tile prediction loop) --
+        # real labels straight from the pbar that's actually doing the work.
+        self.query_one("#progress-phase", Static).update(desc or "Predicting (real per-tile progress)")
+        if total:
+            bar.update(total=total, progress=completed)
+        else:
+            bar.update(total=None)
+
     @work(thread=True)
     def run_segmentation(self) -> None:
         from autoanatomy.engine.api import segment, release_task_memory
+        from autoanatomy.engine.progress import report_progress
 
         app = self.app
         tasks = list(app.selected_tasks)
@@ -121,6 +139,9 @@ class RunProgressScreen(Screen):
                 low_memory=app.low_memory,
             )
 
+        def _progress_callback(completed, total, desc):
+            app.call_from_thread(self._on_progress, completed, total, desc)
+
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
             with _redirect_stdout(stream):
@@ -130,6 +151,10 @@ class RunProgressScreen(Screen):
                     app.call_from_thread(
                         self.log_line, f"Running {len(tasks)} tasks in parallel: {', '.join(tasks)}",
                     )
+                    # Each parallel task runs in its own OS process, so the
+                    # in-process progress hook below can't reach it -- no bar
+                    # for this path, just the existing per-task log output.
+                    app.call_from_thread(self._reset_progress, "")
 
                     def _on_task_done(task_name, output_text, error):
                         app.call_from_thread(self.log_line, f"=== {task_name} ({'failed' if error else 'done'}) ===")
@@ -148,7 +173,9 @@ class RunProgressScreen(Screen):
                     for i, task in enumerate(tasks):
                         if multi_task:
                             app.call_from_thread(self.log_line, f"=== Running {i + 1}/{len(tasks)}: {task} ===")
-                        segment(**_task_kwargs(task))
+                        app.call_from_thread(self._reset_progress, f"Preparing {task}...")
+                        with report_progress(_progress_callback):
+                            segment(**_task_kwargs(task))
                         release_task_memory()
             if app.statistics:
                 # Only meaningful for the last task run when --ml is used across
