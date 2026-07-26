@@ -7,14 +7,12 @@ from autoanatomy.engine.registry import (
     task_modality,
 )
 
-EXPECTED_CRANIOFACIAL = {
-    1: "mandible",
-    2: "teeth_lower",
-    3: "skull",
-    4: "head",
-    5: "sinus_maxillary",
-    6: "sinus_frontal",
-    7: "teeth_upper",
+EXPECTED_DENTAL_SEGMENTATOR = {
+    1: "upper_skull",
+    2: "mandible",
+    3: "upper_teeth",
+    4: "lower_teeth",
+    5: "mandibular_canal",
 }
 
 EXPECTED_HEAD_MUSCLES = {
@@ -32,8 +30,8 @@ EXPECTED_HEAD_MUSCLES = {
 }
 
 
-def test_craniofacial_structures_matches_upstream():
-    assert class_map["craniofacial_structures"] == EXPECTED_CRANIOFACIAL
+def test_dental_segmentator_matches_upstream():
+    assert class_map["dental_segmentator"] == EXPECTED_DENTAL_SEGMENTATOR
 
 
 def test_head_muscles_matches_upstream():
@@ -41,7 +39,7 @@ def test_head_muscles_matches_upstream():
 
 
 def test_selectable_tasks():
-    assert TASKS == ["craniofacial_structures", "head_muscles", "dental_segmentator", "toothseg"]
+    assert TASKS == ["dental_segmentator", "head_muscles"]
 
 
 def test_no_task_requires_a_license():
@@ -55,13 +53,14 @@ def test_all_tasks_are_ct():
 
 
 def test_get_task_classes_returns_expected_counts():
-    assert len(get_task_classes("craniofacial_structures")) == 7
+    assert len(get_task_classes("dental_segmentator")) == 5
     assert len(get_task_classes("head_muscles")) == 11
 
 
-def test_total_class_map_kept_for_skull_cropping():
-    # engine/api.py crops to the skull region using class_map["total"]["skull"]
-    # before running the craniofacial/head_muscles models -- this must stay intact.
+def test_total_class_map_kept_for_crop_infrastructure():
+    # engine/api.py's generic crop-generation step reads class_map["total"]
+    # for any task whose branch sets crop != None -- this must stay intact
+    # even though no selectable task currently uses it.
     assert class_map["total"][91] == "skull"
 
 

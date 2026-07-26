@@ -1,6 +1,6 @@
 #Requires -Version 5.1
 # Sets up the AutoAnatomy dev environment: isolated .venv, CUDA-matched torch,
-# trimmed dependency set, and the real craniofacial_structures + skull-crop
+# trimmed dependency set, and the real dental_segmentator + head_muscles
 # model weights. Safe to re-run.
 
 $ErrorActionPreference = "Stop"
@@ -55,7 +55,7 @@ if ($cudaOk -eq "True") {
     Write-Host "CUDA not available -- AutoAnatomy will fall back to --device cpu (slower)." -ForegroundColor Yellow
 }
 
-Write-Host "Downloading model weights (craniofacial_structures + skull-crop model) ..."
+Write-Host "Downloading model weights (dental_segmentator + head_muscles) ..."
 & $py -m autoanatomy.cli.main download-weights
 
 Write-Host "Free disk after setup: $(Get-FreeDiskGB) GB"

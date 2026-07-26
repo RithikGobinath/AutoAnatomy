@@ -21,32 +21,26 @@ from autoanatomy.engine.class_map import class_map, commercial_models
 # infrastructure from upstream (nothing in this build crops to it anymore)
 # -- it is deliberately NOT selectable here, since it's not a product task.
 TASKS = [
-    "craniofacial_structures",
-    "head_muscles",
     "dental_segmentator",
-    "toothseg",
+    "head_muscles",
 ]
 
 # task -> the nnU-Net checkpoint task_id(s) it needs downloaded (see
 # engine/weights.py). Used by the CLI's download-weights/check commands so
 # they can't silently drift out of sync with which tasks actually exist.
 TASK_WEIGHT_IDS = {
-    "craniofacial_structures": [115],
-    "head_muscles": [777],
     "dental_segmentator": [112],
-    "toothseg": [121, 123],
+    "head_muscles": [777],
 }
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
-# surfaced in the TUI's roadmap panel as "coming soon". ("teeth" is no longer
-# listed here -- the "toothseg" task above now covers individual-tooth
-# segmentation, via a different published model than upstream's "teeth" task.)
+# surfaced in the TUI's roadmap panel as "coming soon".
 ROADMAP_TASKS = [
     "head_glands_cavities", "headneck_bones_vessels",
 ]
 
-# Every task's class map uses small (or, for toothseg, FDI-numbered) integer
-# label IDs that overlap across tasks. Structure *names* never collide, so
+# Every task's class map uses small integer label IDs that overlap across
+# tasks. Structure *names* never collide, so
 # results dicts keyed by name are always safe to merge across tasks -- but
 # the slice-viewer overlay and the results table's color swatches are keyed
 # by label ID, so combining more than one task's raw IDs would make unrelated
@@ -56,12 +50,8 @@ ROADMAP_TASKS = [
 # uniformly (even when only one task is being shown) so display behavior
 # never depends on how many tasks happen to be selected in a given run.
 TASK_DISPLAY_OFFSET = {
-    "craniofacial_structures": 0,
-    "head_muscles": 100,
     "dental_segmentator": 200,
-    # toothseg's own label IDs are already the two-digit FDI numbers (11-48),
-    # so no offset is needed to keep them clear of the ranges above.
-    "toothseg": 0,
+    "head_muscles": 100,
 }
 
 # Tasks that operate on MR images but whose name does not end in "_mr".

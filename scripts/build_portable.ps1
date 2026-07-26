@@ -34,8 +34,7 @@ Set-Location $root
 
 # Deliberately NOT under $root, and deliberately as short as possible:
 # several dependencies ship files nested extremely deep (torch's vendored
-# license files; ToothSeg's own checkpoint folder name, ~93 characters by
-# itself) which combined with $root's own path length reliably exceeds
+# license files) which combined with $root's own path length reliably exceeds
 # Windows' 260-character MAX_PATH during pip install / weight download
 # ("[WinError 206] The filename or extension is too long" / a bare
 # FileNotFoundError from zipfile -- both confirmed by actually hitting them).

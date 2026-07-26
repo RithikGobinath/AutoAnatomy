@@ -5,8 +5,10 @@ This product is a derivative work of TotalSegmentator
 (https://github.com/wasserth/TotalSegmentator), created by Jakob Wasserthal
 and the TotalSegmentator contributors, licensed under the Apache License 2.0.
 
-AutoAnatomy strips TotalSegmentator down to its craniofacial_structures task
-(mandible, teeth, skull, head, sinuses) and adds a new Textual-based terminal
-GUI and headless CLI on top of the retained nnU-Net inference engine.
+AutoAnatomy strips TotalSegmentator down to its head_muscles task and adds a
+new Textual-based terminal GUI and headless CLI on top of the retained
+nnU-Net inference engine. Its primary task, dental_segmentator, runs an
+independently published DentalSegmentator checkpoint (Dot et al., J
+Dentistry 2024; CC-BY 4.0) rather than an upstream TotalSegmentator task.
 
 See LICENSE for the full Apache 2.0 license text.

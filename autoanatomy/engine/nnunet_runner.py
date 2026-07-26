@@ -35,6 +35,7 @@ from autoanatomy.engine.custom_trainers import (nnUNetTrainer_MOSAIC_1k_QuarterL
                                               nnUNetTrainerDiceTopK10Loss_2000epochs,
                                               nnUNetTrainerSkeletonRecall)
 from autoanatomy.engine.nnunet_runtime_patches import patch_nnunet_cropped_logits_resampling
+from autoanatomy.engine.progress import patch_tqdm_progress
 
 custom_trainers = {
     "nnUNetTrainer_MOSAIC_1k_QuarterLR_NoMirroring": nnUNetTrainer_MOSAIC_1k_QuarterLR_NoMirroring,
@@ -64,6 +65,7 @@ if nnunet_find_objects is not None:
 nnunet_predict_from_raw_data.recursive_find_python_class = recursive_find_python_class_custom
 # --- now we have included custom trainers into the nnUNetv2 basic package --- #
 patch_nnunet_cropped_logits_resampling()
+patch_tqdm_progress()
 
 # nnUNet 2.1
 # with nostdout():
@@ -388,7 +390,7 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
                          save_probabilities=None, cascade=None, remove_outside_mask=None, remove_outside_dilation=None,
                          debug=False, save_lowres=False, resampling_order=3, plans="nnUNetPlans",
                          vertebrae_body_mask=None, output_task_name=None, use_cropped_logits_resampling=False,
-                         low_memory=False):
+                         low_memory=False, step_size=None):
     """
     crop: string or a nibabel image
     resample: None or float (target spacing for all dimensions) or list of floats
@@ -592,7 +594,9 @@ def nnUNet_predict_image(file_in: Union[str, Path, Nifti1Image], file_out, task_
             nib.save(nib.Nifti1Image(img_in_rsp_data[:, :, third*2+1-margin:], img_in_rsp.affine),
                     tmp_dir / "s03_0000.nii.gz")
 
-        if task_name in ["total", "total_v3"] and resample is not None and resample[0] < 3.0:
+        if step_size is not None:
+            pass  # explicit override from the caller (e.g. dental_segmentator's max-accuracy config)
+        elif task_name in ["total", "total_v3"] and resample is not None and resample[0] < 3.0:
             # overall speedup for 15mm model roughly 11% (GPU) and 100% (CPU)
             # overall speedup for  3mm model roughly  0% (GPU) and  10% (CPU)
             # (dice 0.001 worse on test set -> ok)

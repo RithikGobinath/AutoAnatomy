@@ -202,14 +202,14 @@ def build_parser():
         help="Run segmentation on a CT scan",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         description="Examples:\n"
-                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures\n"
-                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta craniofacial_structures head_muscles",
+                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta dental_segmentator\n"
+                     "  autoanatomy segment -i t.nii.gz -o out\\ -ta dental_segmentator head_muscles",
     )
     p_seg.add_argument("-i", "--input", required=True, help="CT NIfTI file or DICOM folder")
     p_seg.add_argument("-o", "--output", required=True, help="Output directory (or file path if --ml)")
-    p_seg.add_argument("-ta", "--task", nargs="+", default=["craniofacial_structures"], choices=TASKS,
+    p_seg.add_argument("-ta", "--task", nargs="+", default=["dental_segmentator"], choices=TASKS,
                         help="One or more segmentation tasks to run, space-separated (default: "
-                             "craniofacial_structures). Run 'autoanatomy list-structures' to see every "
+                             "dental_segmentator). Run 'autoanatomy list-structures' to see every "
                              "task and the structures it produces.")
     p_seg.add_argument("--structures", metavar="NAME[,NAME...]",
                         help="Only save these structures (comma-separated names, matched against whichever "

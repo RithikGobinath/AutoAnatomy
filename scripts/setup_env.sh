@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Sets up the AutoAnatomy dev environment: isolated .venv, CUDA-matched torch,
-# trimmed dependency set, and the real craniofacial_structures + skull-crop
+# trimmed dependency set, and the real dental_segmentator + head_muscles
 # model weights. Safe to re-run.
 set -euo pipefail
 
@@ -45,7 +45,7 @@ else
     echo "CUDA not available -- AutoAnatomy will fall back to --device cpu (slower)."
 fi
 
-echo "Downloading model weights (craniofacial_structures + skull-crop model) ..."
+echo "Downloading model weights (dental_segmentator + head_muscles) ..."
 "$PY" -m autoanatomy.cli.main download-weights
 
 df -h "$root" | tail -1

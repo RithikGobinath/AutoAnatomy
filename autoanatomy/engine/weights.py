@@ -3,7 +3,6 @@ import os
 import contextlib
 import sys
 import time
-import shutil
 import zipfile
 from pathlib import Path
 
@@ -36,30 +35,6 @@ def nostdout(verbose=False):
             sys.stdout = save_stdout
     else:
         yield
-
-
-def robust_rmtree(path, max_retries=3, delay=0.5):
-    """
-    Robustly remove a directory tree, handling issues with NFS and network filesystems.
-    
-    Args:
-        path: Path to directory to remove
-        max_retries: Maximum number of retry attempts
-        delay: Delay in seconds between retries
-    """
-    for attempt in range(max_retries):
-        try:
-            if os.path.exists(path):
-                shutil.rmtree(path)
-            return  # Success
-        except OSError as e:
-            if attempt < max_retries - 1:
-                # Wait and retry
-                time.sleep(delay)
-                delay *= 2  # Exponential backoff
-            else:
-                # Last attempt failed, raise the error
-                raise OSError(f"Failed to remove {path} after {max_retries} attempts: {e}")
 
 
 def download_url_and_unpack(url, config_dir):
@@ -112,11 +87,8 @@ WEIGHTS_FOLDER_NAMES = {
     297: "Dataset297_TotalSegmentator_total_3mm_1559subj",
     298: "Dataset298_TotalSegmentator_total_6mm_1559subj",
     294: "Dataset294_TotalSegmentator_part4_muscles_1559subj",
-    115: "Dataset115_mandible",
     777: "Dataset777_head_muscles_492subj",
     112: "Dataset112_DentalSegmentator_v100",
-    121: "Dataset121_ToothFairy2_Teeth",
-    123: "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px",
 }
 
 
@@ -141,28 +113,17 @@ def download_pretrained_weights(task_id):
         # so the 1.5mm crop tier downloads just this single part instead of all 5.
         weights_path = config_dir / "Dataset294_TotalSegmentator_part4_muscles_1559subj"
         WEIGHTS_URL = url + "/v2.0.0-weights/Dataset294_TotalSegmentator_part4_muscles_1559subj.zip"
-    elif task_id == 115:
-        weights_path = config_dir / "Dataset115_mandible"
-        WEIGHTS_URL = url + "/v2.5.0-weights/Dataset115_mandible.zip"
     elif task_id == 777:
         weights_path = config_dir / "Dataset777_head_muscles_492subj"
         WEIGHTS_URL = url + "/v2.3.0-weights/Dataset777_head_muscles_492subj.zip"
     elif task_id == 112:
         # DentalSegmentator (Dot et al., J Dentistry 2024) -- an independently
         # published, CC-BY 4.0 nnU-Net v2 checkpoint, not part of upstream
-        # TotalSegmentator. Only "upper_skull", "mandible" and
-        # "mandibular_canal" are exposed by class_map["dental_segmentator"];
-        # its "upper_teeth"/"lower_teeth" classes are computed but never
-        # surfaced, since the "toothseg" task supersedes them.
+        # TotalSegmentator. All five of its classes are exposed by
+        # class_map["dental_segmentator"], including "upper_teeth"/
+        # "lower_teeth".
         weights_path = config_dir / "Dataset112_DentalSegmentator_v100"
         WEIGHTS_URL = "https://zenodo.org/records/10829675/files/Dataset112_DentalSegmentator_v100.zip"
-    elif task_id in (121, 123):
-        # ToothSeg (van Nistelrooij, Kramer et al., IEEE JBHI 2026) -- individual
-        # per-tooth (FDI) instance segmentation. Both its semantic (121) and
-        # instance/border-core (123) branches ship in one Zenodo release, so
-        # they share a dedicated download helper instead of this if/elif chain.
-        _download_toothseg_weights(config_dir)
-        return
     else:
         raise ValueError(f"For task_id {task_id} no download path was found.")
 
@@ -171,43 +132,6 @@ def download_pretrained_weights(task_id):
         print(f"Downloading model for Task {task_id} ...")
         weights_path.parent.mkdir(exist_ok=True, parents=True)
         download_url_and_unpack(WEIGHTS_URL, weights_path.parent)
-
-
-def _download_toothseg_weights(config_dir):
-    """Download and unpack the ToothSeg checkpoint release.
-
-    Both branch checkpoints (Dataset121_ToothFairy2_Teeth,
-    Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px) are bundled together
-    inside a single Zenodo zip, wrapped in one extra "ToothSeg/" folder. This
-    flattens both dataset folders up to config_dir directly, so they line up
-    with every other model's flat "config_dir/DatasetXXX_.../" layout.
-    """
-    sem_path = config_dir / "Dataset121_ToothFairy2_Teeth"
-    inst_path = config_dir / "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px"
-    if sem_path.exists() and inst_path.exists():
-        return
-
-    print("Downloading ToothSeg model (semantic + instance branches, ~920MB) ...")
-    url = "https://zenodo.org/records/14893540/files/ToothSeg.zip"
-    # Short name deliberately: this checkpoint's own trainer/config folder
-    # (nnUNetTrainer_onlyMirror01_DASegOrd0__nnUNetPlans__3d_fullres_
-    # resample_torch_256_bs8_ctnorm, ~93 characters) plus the rest of a
-    # typical weights-dir path is already close to Windows' 260-character
-    # MAX_PATH -- confirmed by actually hitting it during a real download.
-    # A long temp-folder name here was the difference between fitting and not.
-    tmp_extract_dir = config_dir / "_ts"
-    tmp_extract_dir.mkdir(exist_ok=True, parents=True)
-    try:
-        download_url_and_unpack(url, tmp_extract_dir)
-        extracted_root = tmp_extract_dir / "ToothSeg"
-        for name in (sem_path.name, inst_path.name):
-            src = extracted_root / name
-            dst = config_dir / name
-            if dst.exists():
-                robust_rmtree(dst)
-            shutil.move(str(src), str(dst))
-    finally:
-        robust_rmtree(tmp_extract_dir)
 
 
 def combine_masks_to_multilabel_file(masks_dir, multilabel_file):

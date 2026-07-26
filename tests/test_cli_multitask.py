@@ -10,7 +10,7 @@ def _args(**overrides):
     ns = argparse.Namespace(
         input="scan.nii.gz",
         output="out",
-        task=["craniofacial_structures"],
+        task=["dental_segmentator"],
         structures=None,
         ml=False,
         device="cpu",
@@ -47,7 +47,7 @@ def test_single_task_is_unchanged_from_pre_multitask_behavior(segment_calls):
     rc = cmd_segment(_args())
     assert rc == 0
     assert len(segment_calls) == 1
-    assert segment_calls[0]["task"] == "craniofacial_structures"
+    assert segment_calls[0]["task"] == "dental_segmentator"
     assert segment_calls[0]["roi_subset"] is None
     assert str(segment_calls[0]["output"]) == "out"
 
@@ -60,43 +60,43 @@ def test_single_task_ml_keeps_literal_output_path(segment_calls):
 
 
 def test_multi_task_runs_both_with_no_structures_filter(segment_calls):
-    rc = cmd_segment(_args(task=["craniofacial_structures", "head_muscles"]))
+    rc = cmd_segment(_args(task=["dental_segmentator", "head_muscles"]))
     assert rc == 0
     assert len(segment_calls) == 2
-    assert {c["task"] for c in segment_calls} == {"craniofacial_structures", "head_muscles"}
+    assert {c["task"] for c in segment_calls} == {"dental_segmentator", "head_muscles"}
     assert all(c["roi_subset"] is None for c in segment_calls)
     assert all(str(c["output"]) == "out" for c in segment_calls)
 
 
 def test_multi_task_ml_suffixes_output_per_task(segment_calls):
-    rc = cmd_segment(_args(task=["craniofacial_structures", "head_muscles"], ml=True, output="out.nii.gz"))
+    rc = cmd_segment(_args(task=["dental_segmentator", "head_muscles"], ml=True, output="out.nii.gz"))
     assert rc == 0
     outs = sorted(str(c["output"]) for c in segment_calls)
-    assert outs == ["out_craniofacial_structures.nii.gz", "out_head_muscles.nii.gz"]
+    assert outs == ["out_dental_segmentator.nii.gz", "out_head_muscles.nii.gz"]
 
 
 def test_multi_task_structures_split_per_task(segment_calls):
     rc = cmd_segment(_args(
-        task=["craniofacial_structures", "head_muscles"],
+        task=["dental_segmentator", "head_muscles"],
         structures="mandible,masseter_left,tongue",
     ))
     assert rc == 0
     by_task = {c["task"]: c["roi_subset"] for c in segment_calls}
-    assert by_task["craniofacial_structures"] == ["mandible"]
+    assert by_task["dental_segmentator"] == ["mandible"]
     assert sorted(by_task["head_muscles"]) == ["masseter_left", "tongue"]
 
 
 def test_multi_task_structures_matching_only_one_task_skips_the_other(segment_calls):
-    rc = cmd_segment(_args(task=["craniofacial_structures", "head_muscles"], structures="mandible"))
+    rc = cmd_segment(_args(task=["dental_segmentator", "head_muscles"], structures="mandible"))
     assert rc == 0
     assert len(segment_calls) == 1
-    assert segment_calls[0]["task"] == "craniofacial_structures"
+    assert segment_calls[0]["task"] == "dental_segmentator"
     assert segment_calls[0]["roi_subset"] == ["mandible"]
 
 
 def test_unknown_structure_name_is_an_error(segment_calls):
     rc = cmd_segment(_args(
-        task=["craniofacial_structures", "head_muscles"],
+        task=["dental_segmentator", "head_muscles"],
         structures="mandible,not_a_real_structure",
     ))
     assert rc == 1
@@ -104,7 +104,7 @@ def test_unknown_structure_name_is_an_error(segment_calls):
 
 
 def test_structures_matching_no_selected_task_is_an_error(segment_calls):
-    rc = cmd_segment(_args(task=["craniofacial_structures"], structures="masseter_left"))
+    rc = cmd_segment(_args(task=["dental_segmentator"], structures="masseter_left"))
     assert rc == 1
     assert segment_calls == []
 

@@ -1,8 +1,8 @@
 class_map = {
 
-    # Kept because the craniofacial_structures pipeline crops to the skull
-    # region first, using a rough low-res whole-scan segmentation (see
-    # engine/api.py crop step).
+    # Kept as generic infrastructure for the crop-generation step in
+    # engine/api.py (used by any task whose branch sets crop != None) -- no
+    # selectable task in this build currently crops.
     "total": {
         1: "spleen",
         2: "kidney_right",
@@ -123,19 +123,24 @@ class_map = {
         117: "costal_cartilages"
     },
 
-    # AutoAnatomy's actual product task: mandible, teeth, skull, head, sinuses
-    "craniofacial_structures": {
-        1: "mandible",
-        2: "teeth_lower",
-        3: "skull",
-        4: "head",
-        5: "sinus_maxillary",
-        6: "sinus_frontal",
-        7: "teeth_upper"
+    # First AutoAnatomy product task: DentalSegmentator (Dot et al., J
+    # Dentistry 2024; CC-BY 4.0; Dataset112_DentalSegmentator_v100, task_id
+    # 112). Trained and validated on both conventional CT and CBCT (unlike
+    # CBCT-only alternatives), at 0.43x0.31x0.43mm native spacing, single
+    # published fold. Runs on the full input image, no cropping.
+    "dental_segmentator": {
+        1: "upper_skull",
+        # Named distinctly from head_muscles' skull-adjacent structures --
+        # structure names must stay unique across every task (see
+        # tests/test_class_map.py), since per-file saving and the multi-task
+        # results table both key by name.
+        2: "mandible",
+        3: "upper_teeth",
+        4: "lower_teeth",
+        5: "mandibular_canal",
     },
 
     # Second AutoAnatomy product task: chewing/swallowing muscles of the head.
-    # Also crops to "skull" via the total class map, same as craniofacial_structures.
     "head_muscles": {
         1: "masseter_right",
         2: "masseter_left",
@@ -149,66 +154,18 @@ class_map = {
         10: "digastric_right",
         11: "digastric_left"
     },
-
-    # Third AutoAnatomy product task: DentalSegmentator (Dot et al., J Dentistry
-    # 2024; CC-BY 4.0; Dataset112_DentalSegmentator_v100, task_id 112). The
-    # underlying model also predicts "upper_teeth"/"lower_teeth" (raw label IDs
-    # 3 and 4), but those are deliberately left out of this map -- the
-    # "toothseg" task below supersedes them with individually-numbered,
-    # finer-resolution teeth, so this task exists only for the three
-    # structures nothing else in this build covers at this precision.
-    "dental_segmentator": {
-        1: "upper_skull",
-        # Named distinctly from craniofacial_structures' own "mandible" -- both
-        # tasks independently produce a mandible mask, and structure names must
-        # stay unique across every task (see tests/test_class_map.py), since
-        # per-file saving and the multi-task results table both key by name.
-        # This is the more precise of the two (see engine/api.py's
-        # "dental_segmentator" branch).
-        2: "mandible_precise",
-        5: "mandibular_canal",
-    },
-
-    # Fourth AutoAnatomy product task: ToothSeg (van Nistelrooij, Kramer et al.,
-    # IEEE JBHI 2026; Apache-2.0/CC-BY 4.0; Datasets 121+123). Individual tooth
-    # instance segmentation and FDI numbering -- see engine/toothseg_runner.py
-    # for the custom two-branch inference pipeline this task requires (it does
-    # not go through the single-checkpoint nnUNet_predict_image path the other
-    # three tasks use). Label IDs are the real two-digit FDI tooth numbers.
-    "toothseg": {
-        11: "tooth_11", 12: "tooth_12", 13: "tooth_13", 14: "tooth_14",
-        15: "tooth_15", 16: "tooth_16", 17: "tooth_17", 18: "tooth_18",
-        21: "tooth_21", 22: "tooth_22", 23: "tooth_23", 24: "tooth_24",
-        25: "tooth_25", 26: "tooth_26", 27: "tooth_27", 28: "tooth_28",
-        31: "tooth_31", 32: "tooth_32", 33: "tooth_33", 34: "tooth_34",
-        35: "tooth_35", 36: "tooth_36", 37: "tooth_37", 38: "tooth_38",
-        41: "tooth_41", 42: "tooth_42", 43: "tooth_43", 44: "tooth_44",
-        45: "tooth_45", 46: "tooth_46", 47: "tooth_47", 48: "tooth_48",
-    },
 }
 
-# ToothSeg's semantic branch (Dataset121_ToothFairy2_Teeth) outputs 32 ordered
-# FDI tooth-position classes (upper-right quadrant first, then upper-left,
-# lower-left, lower-right), each 8 positions from central incisor to 3rd
-# molar. This is the model's native class order -- toothseg_runner.py needs it
-# to line up per-voxel softmax probabilities (indices 1-32) with FDI numbers.
-TOOTHSEG_SEMANTIC_FDI_ORDER = [
-    11, 12, 13, 14, 15, 16, 17, 18,
-    21, 22, 23, 24, 25, 26, 27, 28,
-    31, 32, 33, 34, 35, 36, 37, 38,
-    41, 42, 43, 44, 45, 46, 47, 48,
-]
-
-# No task in this build requires a commercial license (craniofacial_structures
-# and the "total" rough-crop model are both free). Kept as an empty dict so
-# engine/weights.py's import contract still holds.
+# No task in this build requires a commercial license (dental_segmentator,
+# head_muscles, and the "total" rough-crop model are all free). Kept as an
+# empty dict so engine/weights.py's import contract still holds.
 commercial_models = {}
 
 # --- Supporting maps for the multi-part nnU-Net "total" ensemble machinery ---
 # Kept from upstream because engine/nnunet_runner.py imports these unconditionally.
-# Not exercised by the craniofacial_structures pipeline itself (which uses single-
-# model task IDs), but the rough-crop step can fall back to related total-task
-# infrastructure, so these stay intact for fidelity with upstream behavior.
+# Not exercised by either selectable task in this build (both use single-model
+# task IDs with no cropping), but the rough-crop step can fall back to related
+# total-task infrastructure, so these stay intact for fidelity with upstream behavior.
 class_map_5_parts = {
 
     # 24 classes

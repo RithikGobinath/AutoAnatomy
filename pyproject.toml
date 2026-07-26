@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "autoanatomy"
 version = "0.2.0"
-description = "Craniofacial CT segmentation (mandible, teeth, skull, head, sinuses) with a terminal GUI."
+description = "Craniofacial CT segmentation (jaw, teeth, skull, mandibular canal, chewing muscles) with a terminal GUI."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "Apache-2.0" }

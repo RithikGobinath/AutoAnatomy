@@ -8,22 +8,12 @@ from textual.widgets import Static
 # ID), not the raw label ID written into the actual NIfTI files. Multiple
 # tasks can be shown combined in one overlay/table, so each task gets its own
 # offset range to keep colors from colliding between unrelated structures
-# that happen to share a raw ID (e.g. craniofacial's "mandible"=1 and
-# head_muscles' "masseter_right"=1). Applied uniformly even for a single
-# task, so display never depends on how many tasks are selected this run.
-# craniofacial_structures: offset 0 -> IDs 1-7. head_muscles: offset 100 ->
-# IDs 101-111. Extend both this and TASK_DISPLAY_OFFSET if a task with more
+# that happen to share a raw ID. Applied uniformly even for a single task, so
+# display never depends on how many tasks are selected this run.
+# head_muscles: offset 100 -> IDs 101-111. dental_segmentator: offset 200 ->
+# IDs 201-205. Extend both this and TASK_DISPLAY_OFFSET if a task with more
 # labels ships.
 LABEL_COLORS = {
-    1: (230, 25, 75),    # red
-    2: (60, 180, 75),    # green
-    3: (255, 225, 25),   # yellow
-    4: (70, 130, 240),   # blue
-    5: (245, 130, 48),   # orange
-    6: (145, 30, 180),   # purple
-    7: (0, 200, 200),    # cyan
-    # Deliberately a different palette from 1-7 above, not a repeat -- these
-    # can be shown in the same combined overlay/table as craniofacial_structures.
     101: (255, 182, 193),  # pink
     102: (0, 128, 128),    # teal
     103: (128, 128, 0),    # olive
@@ -35,32 +25,14 @@ LABEL_COLORS = {
     109: (170, 255, 195),  # mint
     110: (220, 190, 255),  # lavender
     111: (255, 215, 0),    # gold
-    # dental_segmentator: offset 200 -> IDs 201 (upper_skull), 202 (mandible),
-    # 205 (mandibular_canal). A third distinct palette.
+    # dental_segmentator: IDs 201 (upper_skull), 202 (mandible),
+    # 203 (upper_teeth), 204 (lower_teeth), 205 (mandibular_canal).
     201: (0, 191, 255),    # deep sky blue
     202: (255, 105, 180),  # hot pink
+    203: (255, 165, 0),    # orange
+    204: (50, 205, 50),    # lime green
     205: (154, 205, 50),   # yellow green
 }
-
-# toothseg: offset 0 -> IDs are the real two-digit FDI tooth numbers
-# (11-18, 21-28, 31-38, 41-48), so they're generated into LABEL_COLORS
-# separately rather than hand-picked -- 32 individually-numbered teeth is too
-# many for a hand-picked palette, and any reasonable, distinct set is fine
-# here since teeth aren't colored to convey meaning beyond "which one".
-def _toothseg_colors():
-    import colorsys
-    colors = {}
-    fdi_numbers = (
-        list(range(11, 19)) + list(range(21, 29)) + list(range(31, 39)) + list(range(41, 49))
-    )
-    for i, fdi in enumerate(fdi_numbers):
-        hue = i / len(fdi_numbers)
-        r, g, b = colorsys.hsv_to_rgb(hue, 0.65, 0.95)
-        colors[fdi] = (int(r * 255), int(g * 255), int(b * 255))
-    return colors
-
-
-LABEL_COLORS.update(_toothseg_colors())
 
 HU_WINDOW_MIN = -200
 HU_WINDOW_MAX = 1200

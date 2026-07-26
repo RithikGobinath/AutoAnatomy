@@ -1,7 +1,7 @@
 # AutoAnatomy
 
-Craniofacial CT segmentation — mandible, teeth, skull, head, sinuses — with a
-terminal GUI, built around a real nnU-Net inference engine.
+Craniofacial CT segmentation — jaw, teeth, skull, mandibular canal, chewing
+muscles — with a terminal GUI, built around a real nnU-Net inference engine.
 
 > **Status: under construction.** The segmentation engine is real (real
 > downloaded nnU-Net weights, real GPU/CPU inference, real DICOM/NIfTI I/O).
@@ -11,17 +11,21 @@ terminal GUI, built around a real nnU-Net inference engine.
 
 ## What it segments today
 
-One task, `craniofacial_structures` (7 classes, 0.5mm isotropic):
+**`dental_segmentator`** (5 classes, 0.43x0.31x0.43mm native spacing) — the
+default task, tuned for maximum accuracy: mirroring test-time augmentation,
+a finer 0.25 sliding-window step size, and the smoothest resampling path.
+Validated on both conventional CT and CBCT (Dot et al., J Dentistry 2024):
 
 | Label | Structure |
 |-------|-----------|
-| 1 | mandible |
-| 2 | teeth_lower |
-| 3 | skull |
-| 4 | head |
-| 5 | sinus_maxillary |
-| 6 | sinus_frontal |
-| 7 | teeth_upper |
+| 1 | upper_skull |
+| 2 | mandible |
+| 3 | upper_teeth |
+| 4 | lower_teeth |
+| 5 | mandibular_canal |
+
+**`head_muscles`** (11 classes, 0.75x0.75x1.0mm) — chewing/swallowing
+muscles: masseter, temporalis, pterygoids, tongue, digastric.
 
 No license required — free for non-commercial and commercial use alike.
 
@@ -40,20 +44,19 @@ No license required — free for non-commercial and commercial use alike.
 .venv/bin/autoanatomy check
 ```
 
-First run downloads two real model checkpoints from GitHub releases: the
-craniofacial_structures model itself (~230MB) and a rough whole-body model
-(~135MB) used internally to crop the scan down to the skull region before the
-high-resolution model runs.
+First run downloads the model checkpoint(s) for whichever task(s) you select
+from GitHub releases / Zenodo.
 
 ## How it works
 
-1. **Rough crop.** A 6mm low-res pass locates the skull so the expensive
-   0.5mm model only has to run on a small ROI.
-2. **craniofacial_structures inference.** The real nnU-Net model
-   (`nnUNetTrainer_DASegOrd0_NoMirroring`, task 115) segments the cropped
-   region at 0.5mm.
-3. **Postprocess + export.** Masks are resampled back to the original scan
-   geometry and written out as NIfTI (per-structure or multilabel).
+1. **DentalSegmentator inference.** The real nnU-Net model (`nnUNetTrainer`,
+   task 112) runs directly on the full input scan at its native
+   0.43x0.31x0.43mm spacing — no cropping, mirroring TTA enabled, 0.25
+   sliding-window step size.
+2. **Postprocess + export.** Masks are resampled back to the original scan
+   geometry (via nnU-Net's own probability-based resampling, not a manual
+   nearest-neighbor pass) and written out as NIfTI (per-structure or
+   multilabel).
 
 See [`autoanatomy/engine/api.py`](autoanatomy/engine/api.py) for the full
 pipeline.

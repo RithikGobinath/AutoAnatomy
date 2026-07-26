@@ -23,7 +23,7 @@ class SettingsScreen(Screen):
                 classes="hint",
             )
             yield Static(
-                "License / cloud sync: not applicable — craniofacial_structures "
+                "License / cloud sync: not applicable — every task in this build "
                 "is free for non-commercial use, no license needed.",
                 classes="hint",
             )

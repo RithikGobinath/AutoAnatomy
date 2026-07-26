@@ -59,10 +59,15 @@ class SystemStatus(Static):
         widget = self.query_one("#weights-status", Static)
         try:
             from autoanatomy.engine.config import get_weights_dir
+            from autoanatomy.engine.registry import TASK_WEIGHT_IDS
+            from autoanatomy.engine.weights import WEIGHTS_FOLDER_NAMES
             weights_dir = get_weights_dir()
-            craniofacial_ok = (weights_dir / "Dataset115_mandible").exists()
-            crop_ok = (weights_dir / "Dataset298_TotalSegmentator_total_6mm_1559subj").exists()
-            if craniofacial_ok and crop_ok:
+            all_cached = all(
+                (weights_dir / WEIGHTS_FOLDER_NAMES[task_id]).exists()
+                for task_ids in TASK_WEIGHT_IDS.values()
+                for task_id in task_ids
+            )
+            if all_cached:
                 widget.update("[b]Models[/b] [green]cached[/green]")
             else:
                 widget.update("[b]Models[/b] [yellow]not downloaded[/yellow]")
