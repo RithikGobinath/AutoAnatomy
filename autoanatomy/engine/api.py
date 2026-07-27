@@ -166,7 +166,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
                      robust_crop=False, higher_order_resampling_LEGACY=False, higher_order_resampling=False,
                      save_probabilities=None,
                      debug=False, report=None, statistics_extra=False, save_lowres=False, resampling_order=3,
-                     plans="nnUNetPlans", model_size="big", low_memory=False):
+                     plans="nnUNetPlans", model_size="big", low_memory=False, mirroring=None):
     """
     Run AutoAnatomy's segmentation pipeline from within python.
 
@@ -282,6 +282,12 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
             "mandibular_canal), or task='head_muscles' (masseter, temporalis, pterygoids, "
             "tongue, digastric)."
         )
+
+    # mirroring=None keeps each task's own default above (dental_segmentator:
+    # off, for CPU speed -- see the comment in that branch). Pass True/False
+    # to explicitly override it either way.
+    if mirroring is not None:
+        tta = mirroring
 
     if robust_crop not in (False, True, "3mm", "1.5mm"):
         raise ValueError(f"robust_crop must be False, True, '3mm', or '1.5mm', got {robust_crop!r}")

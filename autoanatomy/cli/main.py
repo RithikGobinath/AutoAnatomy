@@ -95,6 +95,7 @@ def cmd_segment(args):
             resampling_order=args.resampling_order,
             roi_subset=roi_subset,
             low_memory=args.low_memory,
+            mirroring=args.mirroring,
         )
 
     if args.parallel_tasks and multi_task:
@@ -249,6 +250,13 @@ def build_parser():
                              "prediction itself succeeded; and pinned-memory allocation for the background "
                              "preprocessing loader can raise a CUDA out-of-memory error even when there's VRAM "
                              "free for the model itself.")
+    p_seg.add_argument("--mirroring", action=argparse.BooleanOptionalAction, default=None,
+                        help="Override this task's default mirroring test-time augmentation setting "
+                             "(--mirroring forces it on, --no-mirroring forces it off). Mirroring runs "
+                             "up to 8 extra flipped forward passes per tile for slightly cleaner "
+                             "boundaries, at a real cost -- roughly 8x slower on CPU. dental_segmentator "
+                             "defaults to off in this build for that reason. Default: use each task's own "
+                             "recommended setting.")
     p_seg.set_defaults(func=cmd_segment)
 
     p_list = sub.add_parser("list-structures", help="List the structures this build can segment")

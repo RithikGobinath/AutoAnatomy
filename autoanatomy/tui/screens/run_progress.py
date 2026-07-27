@@ -137,6 +137,7 @@ class RunProgressScreen(Screen):
                 nr_thr_saving=app.nr_thr_saving,
                 resampling_order=app.resampling_order,
                 low_memory=app.low_memory,
+                mirroring=app.mirroring,
             )
 
         def _progress_callback(completed, total, desc):

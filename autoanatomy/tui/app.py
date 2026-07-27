@@ -45,6 +45,10 @@ class AutoAnatomyApp(App):
     # synchronously in the same process instead -- slower, but avoids that
     # failure mode entirely rather than just making it less likely.
     low_memory: bool = False
+    # None means "use each task's own recommended default" (see
+    # engine/api.py's dental_segmentator branch: off, for CPU speed). True/False
+    # explicitly overrides it either way -- see the Advanced Settings checkbox.
+    mirroring: bool | None = None
     # Off by default -- running more than one task at once means every
     # task's model is loaded into memory (and, on GPU, VRAM) simultaneously
     # instead of one at a time.

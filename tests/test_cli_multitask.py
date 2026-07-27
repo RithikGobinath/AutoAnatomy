@@ -24,6 +24,7 @@ def _args(**overrides):
         parallel_tasks=False,
         max_parallel_tasks=None,
         low_memory=False,
+        mirroring=None,
     )
     for k, v in overrides.items():
         setattr(ns, k, v)

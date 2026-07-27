@@ -77,6 +77,16 @@ class ConfigureRunScreen(Screen):
                     yield Static("  Resampling order (0-5):", classes="hint")
                     yield Input(value=str(DEFAULT_RESAMPLING_ORDER), id="resampling-order-input", type="integer")
 
+                yield Static("\n  Mirroring test-time augmentation:", classes="hint")
+                with RadioSet(id="mirroring-set"):
+                    yield RadioButton("Off (faster -- default in this build)", value=True, id="mirroring-off")
+                    yield RadioButton("On (slightly more accurate -- roughly 8x slower on CPU)", id="mirroring-on")
+                yield Static(
+                    "  [dim]Mirroring runs up to 8 extra flipped forward passes per tile and averages "
+                    "them for slightly cleaner boundaries. Off by default here since it's the single "
+                    "biggest lever on a CPU-only machine (~27h vs ~3.5h in a real measured run).[/dim]"
+                )
+
                 yield Checkbox(
                     "Run tasks in parallel (faster with multiple tasks selected -- "
                     "uses more RAM/VRAM at once)",
@@ -186,6 +196,10 @@ class ConfigureRunScreen(Screen):
         max_parallel = self._num("max-parallel-tasks-input", int, DEFAULT_MAX_PARALLEL_TASKS)
         self.app.max_parallel_tasks = max(1, max_parallel)
         self.app.low_memory = self.query_one("#low-memory-checkbox", Checkbox).value
+
+        mirroring_set = self.query_one("#mirroring-set", RadioSet)
+        mirroring_pressed = mirroring_set.pressed_button
+        self.app.mirroring = bool(mirroring_pressed and mirroring_pressed.id == "mirroring-on")
 
         from autoanatomy.tui.screens.run_progress import RunProgressScreen
         self.app.push_screen(RunProgressScreen())
