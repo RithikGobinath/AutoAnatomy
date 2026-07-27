@@ -22,6 +22,16 @@ def _run_one_task(kwargs: dict) -> tuple:
     Captures this task's own stdout as one block rather than streaming it
     live, since a child process's prints don't route through the parent's
     own sys.stdout redirection.
+
+    Also redirects stderr to a throwaway buffer (discarded, not returned):
+    engine/progress.py's report_progress() callback is a contextvars.ContextVar,
+    which does not cross the process boundary a spawned worker introduces --
+    so in this child process nnU-Net's own tqdm bars run undiverted and write
+    real \\r-based progress text straight to the real stderr, which is
+    inherited from the parent and corrupts whatever terminal UI (e.g. the
+    Textual TUI) is rendered there. There's no live per-tile bar for this
+    parallel path anyway (see run_progress.py), so this output was never
+    meant to be shown -- just silence it at the source instead of leaking it.
     """
     from autoanatomy.engine.api import segment
 
@@ -29,7 +39,7 @@ def _run_one_task(kwargs: dict) -> tuple:
     buf = io.StringIO()
     error = None
     try:
-        with contextlib.redirect_stdout(buf):
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
             segment(**kwargs)
     except Exception as e:
         error = f"{type(e).__name__}: {e}"
