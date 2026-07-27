@@ -154,12 +154,53 @@ class_map = {
         10: "digastric_right",
         11: "digastric_left"
     },
+
+    # Third AutoAnatomy product task: neck posture/swallowing muscles --
+    # complementary to head_muscles' chewing muscles, zero structure overlap.
+    # Upstream TotalSegmentator task_ids 778+779 (two-part ensemble, combined
+    # here into one sequential 1-23 map the same way class_map["total"]
+    # combines its own 5 parts). Sequential numbering follows
+    # class_map_parts_headneck_muscles' own part1-then-part2 order so the
+    # structure *names* line up for the multimodel lookup-table remap in
+    # nnunet_runner.py (class_map_inv is keyed by name, not raw part-local id).
+    # Unlike head_muscles/dental_segmentator, this model requires a license
+    # for commercial use (see commercial_models below) and, per upstream's
+    # own docs, was not trained on the full TotalSegmentator dataset --
+    # expect it to be less robust than the other two tasks.
+    "headneck_muscles": {
+        1: "sternocleidomastoid_right",
+        2: "sternocleidomastoid_left",
+        3: "superior_pharyngeal_constrictor",
+        4: "middle_pharyngeal_constrictor",
+        5: "inferior_pharyngeal_constrictor",
+        6: "trapezius_right",
+        7: "trapezius_left",
+        8: "platysma_right",
+        9: "platysma_left",
+        10: "levator_scapulae_right",
+        11: "levator_scapulae_left",
+        12: "anterior_scalene_right",
+        13: "anterior_scalene_left",
+        14: "middle_scalene_right",
+        15: "middle_scalene_left",
+        16: "posterior_scalene_right",
+        17: "posterior_scalene_left",
+        18: "sterno_thyroid_right",
+        19: "sterno_thyroid_left",
+        20: "thyrohyoid_right",
+        21: "thyrohyoid_left",
+        22: "prevertebral_right",
+        23: "prevertebral_left",
+    },
 }
 
-# No task in this build requires a commercial license (dental_segmentator,
-# head_muscles, and the "total" rough-crop model are all free). Kept as an
-# empty dict so engine/weights.py's import contract still holds.
-commercial_models = {}
+# dental_segmentator and head_muscles are both free for non-commercial and
+# commercial use alike. headneck_muscles is the one exception in this build:
+# upstream requires a paid license for commercial use (free for non-commercial
+# use) -- contact the model author (see NOTICE) for commercial licensing.
+commercial_models = {
+    "headneck_muscles": "Requires a paid license for commercial use (free for non-commercial use). Contact jakob.wasserthal@usb.ch.",
+}
 
 # --- Supporting maps for the multi-part nnU-Net "total" ensemble machinery ---
 # Kept from upstream because engine/nnunet_runner.py imports these unconditionally.

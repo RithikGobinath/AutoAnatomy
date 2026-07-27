@@ -22,11 +22,20 @@ class SettingsScreen(Screen):
                 f"Default device:    {self.app.device}\n",
                 classes="hint",
             )
-            yield Static(
-                "License / cloud sync: not applicable — every task in this build "
-                "is free for non-commercial use, no license needed.",
-                classes="hint",
-            )
+            from autoanatomy.engine.registry import TASKS, requires_license
+            licensed_tasks = [t for t in TASKS if requires_license(t)]
+            if licensed_tasks:
+                license_text = (
+                    "License / cloud sync: dental_segmentator and head_muscles need no "
+                    f"license. {', '.join(licensed_tasks)} requires a paid license for "
+                    "commercial use (free for non-commercial use) -- see NOTICE."
+                )
+            else:
+                license_text = (
+                    "License / cloud sync: not applicable — every task in this build "
+                    "is free for non-commercial use, no license needed."
+                )
+            yield Static(license_text, classes="hint")
             yield Button("Back", id="back-btn")
         yield Footer()
 

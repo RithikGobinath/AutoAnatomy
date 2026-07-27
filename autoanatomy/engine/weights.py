@@ -89,6 +89,8 @@ WEIGHTS_FOLDER_NAMES = {
     294: "Dataset294_TotalSegmentator_part4_muscles_1559subj",
     777: "Dataset777_head_muscles_492subj",
     112: "Dataset112_DentalSegmentator_v100",
+    778: "Dataset778_headneck_muscles_part1_492subj",
+    779: "Dataset779_headneck_muscles_part2_492subj",
 }
 
 
@@ -124,6 +126,12 @@ def download_pretrained_weights(task_id):
         # "lower_teeth".
         weights_path = config_dir / "Dataset112_DentalSegmentator_v100"
         WEIGHTS_URL = "https://zenodo.org/records/10829675/files/Dataset112_DentalSegmentator_v100.zip"
+    elif task_id == 778:
+        weights_path = config_dir / "Dataset778_headneck_muscles_part1_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset778_headneck_muscles_part1_492subj.zip"
+    elif task_id == 779:
+        weights_path = config_dir / "Dataset779_headneck_muscles_part2_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset779_headneck_muscles_part2_492subj.zip"
     else:
         raise ValueError(f"For task_id {task_id} no download path was found.")
 

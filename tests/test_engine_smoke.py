@@ -55,3 +55,22 @@ def test_real_head_muscles_segmentation_produces_all_eleven_masks(tmp_path):
 
     for name in class_map["head_muscles"].values():
         assert (tmp_path / f"{name}.nii.gz").exists()
+
+
+@pytest.mark.skipif(not _weights_cached("Dataset778_headneck_muscles_part1_492subj",
+                                        "Dataset779_headneck_muscles_part2_492subj"),
+                     reason="model weights not downloaded (run `autoanatomy download-weights`)")
+def test_real_headneck_muscles_segmentation_produces_all_twentythree_masks(tmp_path):
+    from autoanatomy.engine.api import segment
+    from autoanatomy.engine.class_map import class_map
+
+    atlas = Path(__file__).parent / "reference_files" / "ct_brain_atlas_1mm.nii.gz"
+    if not atlas.exists():
+        pytest.skip("reference CT volume not available")
+
+    import torch
+    device = "gpu" if torch.cuda.is_available() else "cpu"
+    segment(input=atlas, output=tmp_path, task="headneck_muscles", device=device, quiet=True)
+
+    for name in class_map["headneck_muscles"].values():
+        assert (tmp_path / f"{name}.nii.gz").exists()

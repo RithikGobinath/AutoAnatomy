@@ -23,6 +23,7 @@ from autoanatomy.engine.class_map import class_map, commercial_models
 TASKS = [
     "dental_segmentator",
     "head_muscles",
+    "headneck_muscles",
 ]
 
 # task -> the nnU-Net checkpoint task_id(s) it needs downloaded (see
@@ -31,6 +32,7 @@ TASKS = [
 TASK_WEIGHT_IDS = {
     "dental_segmentator": [112],
     "head_muscles": [777],
+    "headneck_muscles": [778, 779],
 }
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
@@ -52,6 +54,7 @@ ROADMAP_TASKS = [
 TASK_DISPLAY_OFFSET = {
     "dental_segmentator": 200,
     "head_muscles": 100,
+    "headneck_muscles": 300,
 }
 
 # Tasks that operate on MR images but whose name does not end in "_mr".
@@ -127,7 +130,11 @@ def format_tasks_table():
         lic = "yes" if r["license_required"] else "no"
         lines.append(f"{r['name'].ljust(name_w)}  {r['modality'].ljust(8)}  {lic.ljust(7)}  {r['num_classes']}")
     lines.append("")
-    lines.append(f"{len(rows)} task(s). None require a license in this build.")
+    licensed = [r["name"] for r in rows if r["license_required"]]
+    if licensed:
+        lines.append(f"{len(rows)} task(s). License required for: {', '.join(licensed)} (free for non-commercial use).")
+    else:
+        lines.append(f"{len(rows)} task(s). None require a license in this build.")
     return "\n".join(lines)
 
 

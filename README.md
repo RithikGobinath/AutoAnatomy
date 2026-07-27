@@ -1,7 +1,8 @@
 # AutoAnatomy
 
 Craniofacial CT segmentation — jaw, teeth, skull, mandibular canal, chewing
-muscles — with a terminal GUI, built around a real nnU-Net inference engine.
+and neck muscles — with a terminal GUI, built around a real nnU-Net inference
+engine.
 
 > **Status: under construction.** The segmentation engine is real (real
 > downloaded nnU-Net weights, real GPU/CPU inference, real DICOM/NIfTI I/O).
@@ -12,8 +13,10 @@ muscles — with a terminal GUI, built around a real nnU-Net inference engine.
 ## What it segments today
 
 **`dental_segmentator`** (5 classes, 0.43x0.31x0.43mm native spacing) — the
-default task, tuned for maximum accuracy: mirroring test-time augmentation,
-a finer 0.25 sliding-window step size, and the smoothest resampling path.
+default task, tuned for boundary accuracy: a finer 0.25 sliding-window step
+size and the smoothest resampling path. Mirroring test-time augmentation is
+available but off by default (roughly 8x slower for a small Dice gain) —
+toggle with `--mirroring`/`--no-mirroring` or the TUI's Advanced Settings.
 Validated on both conventional CT and CBCT (Dot et al., J Dentistry 2024):
 
 | Label | Structure |
@@ -27,7 +30,16 @@ Validated on both conventional CT and CBCT (Dot et al., J Dentistry 2024):
 **`head_muscles`** (11 classes, 0.75x0.75x1.0mm) — chewing/swallowing
 muscles: masseter, temporalis, pterygoids, tongue, digastric.
 
-No license required — free for non-commercial and commercial use alike.
+**`headneck_muscles`** (23 classes, 0.75x0.75x1.0mm) — complementary neck
+posture/swallowing muscles, zero overlap with `head_muscles`:
+sternocleidomastoid, pharyngeal constrictors, trapezius, platysma, levator
+scapulae, scalenes, sterno-thyroid, thyrohyoid, prevertebral. Per upstream's
+own docs this wasn't trained on the full TotalSegmentator dataset, so expect
+it to be less robust than the other two tasks. **Requires a paid license for
+commercial use** (free for non-commercial use) — see [NOTICE](NOTICE).
+
+`dental_segmentator` and `head_muscles` need no license (free for commercial
+and non-commercial use alike); `headneck_muscles` is the one exception above.
 
 ## Quick start
 
@@ -51,8 +63,8 @@ from GitHub releases / Zenodo.
 
 1. **DentalSegmentator inference.** The real nnU-Net model (`nnUNetTrainer`,
    task 112) runs directly on the full input scan at its native
-   0.43x0.31x0.43mm spacing — no cropping, mirroring TTA enabled, 0.25
-   sliding-window step size.
+   0.43x0.31x0.43mm spacing — no cropping, 0.25 sliding-window step size,
+   mirroring TTA available via `--mirroring` (off by default).
 2. **Postprocess + export.** Masks are resampled back to the original scan
    geometry (via nnU-Net's own probability-based resampling, not a manual
    nearest-neighbor pass) and written out as NIfTI (per-structure or

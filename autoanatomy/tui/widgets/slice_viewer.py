@@ -11,8 +11,9 @@ from textual.widgets import Static
 # that happen to share a raw ID. Applied uniformly even for a single task, so
 # display never depends on how many tasks are selected this run.
 # head_muscles: offset 100 -> IDs 101-111. dental_segmentator: offset 200 ->
-# IDs 201-205. Extend both this and TASK_DISPLAY_OFFSET if a task with more
-# labels ships.
+# IDs 201-205. headneck_muscles: offset 300 -> IDs 301-323 (generated below,
+# too many structures to hand-pick distinct colors for). Extend this and
+# TASK_DISPLAY_OFFSET if a task with more labels ships.
 LABEL_COLORS = {
     101: (255, 182, 193),  # pink
     102: (0, 128, 128),    # teal
@@ -33,6 +34,23 @@ LABEL_COLORS = {
     204: (50, 205, 50),    # lime green
     205: (154, 205, 50),   # yellow green
 }
+
+
+def _headneck_muscles_colors():
+    """headneck_muscles has 23 structures (display IDs 301-323) -- too many
+    to hand-pick distinct colors for, so spread them evenly around the hue
+    wheel instead. Any reasonably distinct set is fine here since these
+    structures aren't colored to convey clinical meaning, just "which one"."""
+    import colorsys
+    colors = {}
+    for i in range(23):
+        hue = i / 23
+        r, g, b = colorsys.hsv_to_rgb(hue, 0.65, 0.95)
+        colors[301 + i] = (int(r * 255), int(g * 255), int(b * 255))
+    return colors
+
+
+LABEL_COLORS.update(_headneck_muscles_colors())
 
 HU_WINDOW_MIN = -200
 HU_WINDOW_MAX = 1200

@@ -29,6 +29,32 @@ EXPECTED_HEAD_MUSCLES = {
     11: "digastric_left",
 }
 
+EXPECTED_HEADNECK_MUSCLES = {
+    1: "sternocleidomastoid_right",
+    2: "sternocleidomastoid_left",
+    3: "superior_pharyngeal_constrictor",
+    4: "middle_pharyngeal_constrictor",
+    5: "inferior_pharyngeal_constrictor",
+    6: "trapezius_right",
+    7: "trapezius_left",
+    8: "platysma_right",
+    9: "platysma_left",
+    10: "levator_scapulae_right",
+    11: "levator_scapulae_left",
+    12: "anterior_scalene_right",
+    13: "anterior_scalene_left",
+    14: "middle_scalene_right",
+    15: "middle_scalene_left",
+    16: "posterior_scalene_right",
+    17: "posterior_scalene_left",
+    18: "sterno_thyroid_right",
+    19: "sterno_thyroid_left",
+    20: "thyrohyoid_right",
+    21: "thyrohyoid_left",
+    22: "prevertebral_right",
+    23: "prevertebral_left",
+}
+
 
 def test_dental_segmentator_matches_upstream():
     assert class_map["dental_segmentator"] == EXPECTED_DENTAL_SEGMENTATOR
@@ -38,13 +64,21 @@ def test_head_muscles_matches_upstream():
     assert class_map["head_muscles"] == EXPECTED_HEAD_MUSCLES
 
 
+def test_headneck_muscles_matches_upstream():
+    assert class_map["headneck_muscles"] == EXPECTED_HEADNECK_MUSCLES
+
+
 def test_selectable_tasks():
-    assert TASKS == ["dental_segmentator", "head_muscles"]
+    assert TASKS == ["dental_segmentator", "head_muscles", "headneck_muscles"]
 
 
-def test_no_task_requires_a_license():
-    for task in TASKS:
-        assert requires_license(task) is False
+def test_only_headneck_muscles_requires_a_license():
+    # dental_segmentator and head_muscles are both free for commercial and
+    # non-commercial use. headneck_muscles is the one exception in this
+    # build -- upstream requires a paid license for commercial use.
+    assert requires_license("dental_segmentator") is False
+    assert requires_license("head_muscles") is False
+    assert requires_license("headneck_muscles") is True
 
 
 def test_all_tasks_are_ct():
@@ -55,6 +89,7 @@ def test_all_tasks_are_ct():
 def test_get_task_classes_returns_expected_counts():
     assert len(get_task_classes("dental_segmentator")) == 5
     assert len(get_task_classes("head_muscles")) == 11
+    assert len(get_task_classes("headneck_muscles")) == 23
 
 
 def test_total_class_map_kept_for_crop_infrastructure():

@@ -24,13 +24,14 @@ class SplashScreen(Screen):
                 yield Static(BANNER, classes="title-banner")
                 yield Static(
                     "Craniofacial CT segmentation — mandible · teeth · skull · "
-                    "mandibular canal · chewing muscles",
+                    "mandibular canal · chewing + neck muscles",
                     classes="subtitle",
                 )
                 yield SystemStatus()
                 yield Static(
                     "\n[b]Real engine[/b]: this build downloads and runs the actual nnU-Net "
-                    "DentalSegmentator (task 112) and head_muscles (task 777) models on real "
+                    "DentalSegmentator (task 112), head_muscles (task 777), and headneck_muscles "
+                    "(tasks 778+779, license required for commercial use) models on real "
                     "GPU/CPU hardware. No mocked inference.\n",
                     classes="hint",
                 )

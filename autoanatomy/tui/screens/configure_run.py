@@ -10,7 +10,7 @@ from textual.widgets import (
 
 from autoanatomy.engine.class_map import class_map
 from autoanatomy.engine.parallel_runner import DEFAULT_MAX_PARALLEL_TASKS
-from autoanatomy.engine.registry import TASKS
+from autoanatomy.engine.registry import TASKS, requires_license
 
 DEFAULT_BLOB_THRESHOLD_MM3 = 200
 DEFAULT_RESAMPLE_THREADS = 1
@@ -35,7 +35,10 @@ class ConfigureRunScreen(Screen):
             for i, task in enumerate(TASKS):
                 # Preserve today's default: only the first task runs unless you
                 # opt in to more -- a second task roughly doubles run time.
-                yield Checkbox(f"Include {task}", value=(i == 0), id=f"task-enable-{i}")
+                label = f"Include {task}"
+                if requires_license(task):
+                    label += " (license required for commercial use -- see NOTICE)"
+                yield Checkbox(label, value=(i == 0), id=f"task-enable-{i}")
                 with Vertical(id=f"structures-container-{i}", classes="task-structures"):
                     for widget in self._build_structure_checkboxes(task):
                         yield widget

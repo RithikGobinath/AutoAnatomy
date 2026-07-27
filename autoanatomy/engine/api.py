@@ -275,12 +275,40 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         if roi_subset is None:
             roi_subset = list(class_map["dental_segmentator"].values())
         if fast: raise ValueError("task dental_segmentator does not work with option --fast")
+    elif task == "headneck_muscles":
+        # Third AutoAnatomy product task: neck posture/swallowing muscles
+        # (sternocleidomastoid, pharyngeal constrictors, trapezius, platysma,
+        # levator scapulae, scalenes, sterno-thyroid, thyrohyoid,
+        # prevertebral) -- complementary to head_muscles' chewing muscles,
+        # zero structure overlap. Upstream TotalSegmentator task_ids 778+779
+        # (a two-part ensemble; nnunet_runner.py's "headneck_muscles"
+        # class_map_parts branch combines them). Requires a paid license for
+        # commercial use (free for non-commercial) -- see
+        # class_map.commercial_models. Per upstream's own docs this was not
+        # trained on the full TotalSegmentator dataset, so expect it to be
+        # less robust than dental_segmentator/head_muscles.
+        #
+        # crop is deliberately None here even though upstream itself crops to
+        # a clavicle/vertebrae-bounded region first: that pre-crop needs the
+        # rough "total" localization model as an extra dependency/pipeline
+        # step, which this build's other two tasks don't need either, and
+        # skipping it was an explicit choice to keep this task's pipeline as
+        # simple as the other two rather than reintroducing that dependency.
+        task_id = [778, 779]
+        resample = [0.75, 0.75, 1.0]
+        trainer = "nnUNetTrainer_DASegOrd0_NoMirroring"
+        crop = None
+        model = "3d_fullres_high"
+        folds = [0]
+        if fast: raise ValueError("task headneck_muscles does not work with option --fast")
     else:
         raise ValueError(
             f"Unknown task '{task}'. This build of AutoAnatomy only supports "
             "task='dental_segmentator' (upper_skull, mandible, upper_teeth, lower_teeth, "
-            "mandibular_canal), or task='head_muscles' (masseter, temporalis, pterygoids, "
-            "tongue, digastric)."
+            "mandibular_canal), task='head_muscles' (masseter, temporalis, pterygoids, "
+            "tongue, digastric), or task='headneck_muscles' (sternocleidomastoid, "
+            "pharyngeal constrictors, trapezius, platysma, levator scapulae, scalenes, "
+            "sterno-thyroid, thyrohyoid, prevertebral -- license required for commercial use)."
         )
 
     # mirroring=None keeps each task's own default above (dental_segmentator:
