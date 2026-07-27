@@ -246,15 +246,23 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
     elif task == "dental_segmentator":
         # DentalSegmentator (Dot et al., J Dentistry 2024; CC-BY 4.0;
         # Dataset112_DentalSegmentator_v100). AutoAnatomy's only tooth/jaw
-        # task, so it's tuned for maximum accuracy over speed: the smoothest
-        # resampling path (regardless of the caller's own
-        # higher_order_resampling setting), mirroring test-time augmentation
-        # (the checkpoint's "nnUNetTrainer" trainer -- not a "_NoMirroring"
-        # variant -- was trained with mirroring, so TTA is valid here), and a
-        # finer 0.25 sliding-window step size (default 0.5) for maximum
-        # boundary accuracy. No skull-localization pre-crop -- runs on the
-        # full input image. Only one fold was published for this checkpoint,
-        # so folds=[0] is already the most that's available to ensemble.
+        # task, tuned for boundary accuracy: the smoothest resampling path
+        # (regardless of the caller's own higher_order_resampling setting)
+        # and a finer 0.25 sliding-window step size (default 0.5). No
+        # skull-localization pre-crop -- runs on the full input image. Only
+        # one fold was published for this checkpoint, so folds=[0] is
+        # already the most that's available to ensemble.
+        #
+        # Mirroring TTA is deliberately OFF (tta=False) even though the
+        # checkpoint was trained with mirroring and could use it: on CPU
+        # (no CUDA available on this machine) it's an 8-way forward-pass
+        # ensemble (2^3 flip combinations) applied per tile, so it alone
+        # multiplies total runtime ~8x -- confirmed in practice as the
+        # difference between a ~27h and a ~3.5h run for dental_segmentator +
+        # head_muscles together. The Dice cost of skipping it is normally
+        # small (nnU-Net's own benchmarks put it well under 1%); the fine
+        # 0.25 step size is kept since it's much cheaper than mirroring for
+        # the boundary-accuracy it buys.
         task_id = 112
         resample = [0.43164101243019104, 0.31200000643730164, 0.43164101243019104]
         trainer = "nnUNetTrainer"
@@ -262,7 +270,7 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         model = "3d_fullres"
         folds = [0]
         higher_order_resampling = True
-        tta = True
+        tta = False
         step_size = 0.25
         if roi_subset is None:
             roi_subset = list(class_map["dental_segmentator"].values())
