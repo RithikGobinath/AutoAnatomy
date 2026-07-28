@@ -55,11 +55,63 @@ LABEL_COLORS.update(_headneck_muscles_colors())
 HU_WINDOW_MIN = -200
 HU_WINDOW_MAX = 1200
 
+_HALF_BLOCK = "▀"  # upper half block -- foreground = top pixel, background = bottom pixel
+
+
+def _block_reduce(img: np.ndarray, mask, out_h: int, out_w: int):
+    """Downsample `img` (grayscale, area-averaged per output cell) and `mask`
+    (categorical, majority vote among non-background labels present in each
+    cell) from native resolution to an out_h x out_w grid.
+
+    Unlike np.linspace-based point sampling (the previous approach), every
+    source pixel contributes to some output cell -- a thin one-voxel-wide
+    structure can no longer disappear just because it didn't land on a
+    sampled index, and the grayscale background is properly anti-aliased
+    instead of looking speckled at low output resolution.
+    """
+    h, w = img.shape
+    out_h = max(1, min(out_h, h))
+    out_w = max(1, min(out_w, w))
+    row_edges = np.linspace(0, h, out_h + 1).astype(int)
+    col_edges = np.linspace(0, w, out_w + 1).astype(int)
+
+    img_out = np.zeros((out_h, out_w), dtype=np.float64)
+    mask_out = np.zeros((out_h, out_w), dtype=mask.dtype) if mask is not None else None
+
+    for i in range(out_h):
+        r0, r1 = row_edges[i], max(row_edges[i] + 1, row_edges[i + 1])
+        for j in range(out_w):
+            c0, c1 = col_edges[j], max(col_edges[j] + 1, col_edges[j + 1])
+            img_out[i, j] = img[r0:r1, c0:c1].mean()
+            if mask is not None:
+                mblock = mask[r0:r1, c0:c1]
+                nonzero = mblock[mblock != 0]
+                if nonzero.size:
+                    vals, counts = np.unique(nonzero, return_counts=True)
+                    mask_out[i, j] = vals[np.argmax(counts)]
+    return img_out, mask_out
+
+
+def _pixel_rgb(gray_value, label) -> tuple:
+    if label in LABEL_COLORS:
+        return LABEL_COLORS[label]
+    g = int(gray_value)
+    return (g, g, g)
+
 
 class SliceViewer(Static):
     """Renders a real axial/coronal/sagittal slice of a NIfTI volume (+ optional
     label mask overlay) as truecolor terminal blocks. Not a placeholder -- this
-    reads actual numpy arrays produced by the segmentation engine."""
+    reads actual numpy arrays produced by the segmentation engine.
+
+    Uses half-block (▀) rendering: each character cell shows two
+    independent colors (foreground = top image pixel, background = bottom),
+    roughly doubling vertical resolution over a naive one-color-per-cell
+    approach. Combined with dropping the old "2 characters per pixel" width
+    padding (a half-cell is already close to square in most monospace
+    fonts), this fits roughly 4x as much real image detail in the same
+    terminal area.
+    """
 
     DEFAULT_CSS = """
     SliceViewer {
@@ -118,28 +170,36 @@ class SliceViewer(Static):
         img = self._take_slice(self.volume)
         mask = self._take_slice(self.mask) if self.mask is not None else None
 
-        width = max(20, self.size.width - 4)
-        height = max(10, self.size.height - 2)
+        width = max(20, self.size.width - 2)
+        height_chars = max(10, self.size.height - 2)
+        # Each character row renders two image rows via half-block glyphs, so
+        # sample twice as many image rows as there are character rows.
+        height = height_chars * 2
 
-        h, w = img.shape
-        row_idx = np.linspace(0, h - 1, min(height, h)).astype(int)
-        col_idx = np.linspace(0, w - 1, min(width, w)).astype(int)
-        img_ds = img[np.ix_(row_idx, col_idx)]
-        mask_ds = mask[np.ix_(row_idx, col_idx)] if mask is not None else None
-
-        clipped = np.clip(img_ds, HU_WINDOW_MIN, HU_WINDOW_MAX)
+        gray_full, mask_ds = _block_reduce(img, mask, height, width)
+        clipped = np.clip(gray_full, HU_WINDOW_MIN, HU_WINDOW_MAX)
         gray = ((clipped - HU_WINDOW_MIN) / (HU_WINDOW_MAX - HU_WINDOW_MIN) * 255).astype(np.uint8)
 
+        n_rows = gray.shape[0]
+        if n_rows % 2 == 1:
+            # Odd row count (possible when the source image has fewer rows
+            # than 2*height_chars) -- duplicate the last row so every
+            # character row still has a full top+bottom pair to draw.
+            gray = np.vstack([gray, gray[-1:]])
+            if mask_ds is not None:
+                mask_ds = np.vstack([mask_ds, mask_ds[-1:]])
+            n_rows += 1
+
         text = Text()
-        for r in range(gray.shape[0]):
+        for r in range(0, n_rows, 2):
             for c in range(gray.shape[1]):
-                label = int(mask_ds[r, c]) if mask_ds is not None else 0
-                if label in LABEL_COLORS:
-                    color = LABEL_COLORS[label]
-                else:
-                    g = int(gray[r, c])
-                    color = (g, g, g)
-                text.append("  ", style=Style(bgcolor=f"rgb({color[0]},{color[1]},{color[2]})"))
+                top_label = int(mask_ds[r, c]) if mask_ds is not None else 0
+                bot_label = int(mask_ds[r + 1, c]) if mask_ds is not None else 0
+                top = _pixel_rgb(gray[r, c], top_label)
+                bot = _pixel_rgb(gray[r + 1, c], bot_label)
+                style = Style(color=f"rgb({top[0]},{top[1]},{top[2]})",
+                             bgcolor=f"rgb({bot[0]},{bot[1]},{bot[2]})")
+                text.append(_HALF_BLOCK, style=style)
             text.append("\n")
 
         axis_name = ["sagittal", "coronal", "axial"][self.axis]
