@@ -105,3 +105,149 @@ def test_slice_viewer_shows_placeholder_before_volume_loaded():
             assert "No scan loaded yet." in text.plain
 
     asyncio.run(_run())
+
+
+def _make_annotatable_app():
+    from textual.app import App, ComposeResult
+
+    from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+
+    class _TestApp(App):
+        def compose(self) -> ComposeResult:
+            yield SliceViewer(id="sv")
+
+    return _TestApp
+
+
+def test_enable_annotation_mode_requires_a_volume_first():
+    from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+
+    sv = SliceViewer()
+    try:
+        sv.enable_annotation_mode()
+        assert False, "should have raised without a loaded volume"
+    except RuntimeError:
+        pass
+
+
+def test_real_mouse_click_paints_the_annotation_mask():
+    from autoanatomy.tui.widgets.slice_viewer import ANNOTATION_FOREGROUND
+
+    async def _run():
+        app = _make_annotatable_app()()
+        async with app.run_test(size=(80, 40)) as pilot:
+            from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+            sv = app.query_one("#sv", SliceViewer)
+            vol = np.zeros((64, 64, 64), dtype=np.float32)
+            sv.set_volume(vol)
+            sv.enable_annotation_mode()
+            await pilot.pause()
+            sv.render()  # populate _row_edges/_col_edges before a real click needs them
+
+            assert sv.annotation_mask.sum() == 0
+            await pilot.click("#sv", offset=(10, 10))
+            await pilot.pause()
+
+            painted = int((sv.annotation_mask == ANNOTATION_FOREGROUND).sum())
+            assert painted > 0, "a real click through Textual's event pipeline painted nothing"
+            assert sv.annotated_slice_count() == 1
+
+    asyncio.run(_run())
+
+
+def test_real_key_presses_switch_label_and_clear():
+    from autoanatomy.tui.widgets.slice_viewer import ANNOTATION_BACKGROUND, ANNOTATION_FOREGROUND
+
+    async def _run():
+        app = _make_annotatable_app()()
+        async with app.run_test(size=(80, 40)) as pilot:
+            from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+            sv = app.query_one("#sv", SliceViewer)
+            vol = np.zeros((64, 64, 64), dtype=np.float32)
+            sv.set_volume(vol)
+            sv.enable_annotation_mode()
+            await pilot.pause()
+            sv.render()
+            sv.focus()
+            await pilot.pause()
+
+            assert sv.paint_label == ANNOTATION_FOREGROUND
+            await pilot.press("b")
+            await pilot.pause()
+            assert sv.paint_label == ANNOTATION_BACKGROUND
+
+            await pilot.press("f")
+            await pilot.pause()
+            assert sv.paint_label == ANNOTATION_FOREGROUND
+
+            sv._paint_at_screen_pos(5, 5)
+            assert sv.annotation_mask.sum() > 0
+            await pilot.press("c")
+            await pilot.pause()
+            assert sv.annotation_mask.sum() == 0
+
+    asyncio.run(_run())
+
+
+def test_key_presses_are_noop_when_annotation_mode_is_off():
+    from autoanatomy.tui.widgets.slice_viewer import ANNOTATION_FOREGROUND
+
+    async def _run():
+        app = _make_annotatable_app()()
+        async with app.run_test(size=(80, 40)) as pilot:
+            from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+            sv = app.query_one("#sv", SliceViewer)
+            vol = np.zeros((64, 64, 64), dtype=np.float32)
+            sv.set_volume(vol)
+            sv.focus()
+            await pilot.pause()
+            # annotation_enabled is False -- switching label must be a no-op
+            assert sv.paint_label == ANNOTATION_FOREGROUND
+            await pilot.press("b")
+            await pilot.pause()
+            assert sv.paint_label == ANNOTATION_FOREGROUND, "label should not change while annotation mode is off"
+
+    asyncio.run(_run())
+
+
+def test_disable_annotation_mode_stops_painting():
+    async def _run():
+        app = _make_annotatable_app()()
+        async with app.run_test(size=(80, 40)) as pilot:
+            from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+            sv = app.query_one("#sv", SliceViewer)
+            vol = np.zeros((64, 64, 64), dtype=np.float32)
+            sv.set_volume(vol)
+            sv.enable_annotation_mode()
+            await pilot.pause()
+            sv.render()
+            sv.disable_annotation_mode()
+
+            sv._paint_at_screen_pos(5, 5)
+            assert sv.annotation_mask.sum() == 0, "painting should be a no-op once annotation mode is disabled"
+
+    asyncio.run(_run())
+
+
+def test_clear_annotation_slice_only_clears_the_current_slice():
+    async def _run():
+        app = _make_annotatable_app()()
+        async with app.run_test(size=(80, 40)) as pilot:
+            from autoanatomy.tui.widgets.slice_viewer import SliceViewer
+            sv = app.query_one("#sv", SliceViewer)
+            vol = np.zeros((64, 64, 64), dtype=np.float32)
+            sv.set_volume(vol)
+            sv.enable_annotation_mode()
+            await pilot.pause()
+            sv.render()
+
+            sv._paint_at_screen_pos(5, 5)
+            sv.scrub(5)
+            sv.render()
+            sv._paint_at_screen_pos(5, 5)
+            assert sv.annotated_slice_count() == 2
+
+            sv.clear_annotation_slice()  # clears only the *current* (post-scrub) slice
+            assert sv.annotated_slice_count() == 1
+
+    asyncio.run(_run())

@@ -1,8 +1,23 @@
 import numpy as np
 from rich.style import Style
 from rich.text import Text
+from textual import events
 from textual.reactive import reactive
 from textual.widgets import Static
+
+# Annotation (graph-cut seed) label values -- distinct from the segmentation
+# result LABEL_COLORS namespace below (those are keyed by *display id*,
+# hundreds+; these are the raw 0/1/2 values painted directly into a seed
+# mask, matching RiccardoBiondi/FemurSegmentation's own --init mask
+# convention: 0 = unlabeled, 1 = foreground/femur, 2 = background).
+ANNOTATION_UNLABELED = 0
+ANNOTATION_FOREGROUND = 1
+ANNOTATION_BACKGROUND = 2
+
+ANNOTATION_COLORS = {
+    ANNOTATION_FOREGROUND: (255, 60, 60),   # bright red seed paint
+    ANNOTATION_BACKGROUND: (60, 140, 255),  # bright blue seed paint
+}
 
 # Keyed by *display* ID (registry.TASK_DISPLAY_OFFSET + a task's native label
 # ID), not the raw label ID written into the actual NIfTI files. Multiple
@@ -58,6 +73,42 @@ HU_WINDOW_MAX = 1200
 _HALF_BLOCK = "▀"  # upper half block -- foreground = top pixel, background = bottom pixel
 
 
+def _compute_edges(h: int, w: int, out_h: int, out_w: int):
+    """Bin edges mapping an h x w source image onto an out_h x out_w grid --
+    shared by _block_reduce_with_edges (rendering) and SliceViewer's mouse
+    handling (so a click maps back to exactly the source region that pixel's
+    color was actually averaged from)."""
+    out_h = max(1, min(out_h, h))
+    out_w = max(1, min(out_w, w))
+    row_edges = np.linspace(0, h, out_h + 1).astype(int)
+    col_edges = np.linspace(0, w, out_w + 1).astype(int)
+    return row_edges, col_edges
+
+
+def _block_reduce_with_edges(img, mask, row_edges: np.ndarray, col_edges: np.ndarray):
+    """Same reduction as _block_reduce, but reusing precomputed bin edges --
+    lets multiple categorical layers (segmentation mask, annotation seed
+    mask) be reduced onto the exact same grid as the grayscale image."""
+    out_h = len(row_edges) - 1
+    out_w = len(col_edges) - 1
+    img_out = np.zeros((out_h, out_w), dtype=np.float64) if img is not None else None
+    mask_out = np.zeros((out_h, out_w), dtype=mask.dtype) if mask is not None else None
+
+    for i in range(out_h):
+        r0, r1 = row_edges[i], max(row_edges[i] + 1, row_edges[i + 1])
+        for j in range(out_w):
+            c0, c1 = col_edges[j], max(col_edges[j] + 1, col_edges[j + 1])
+            if img is not None:
+                img_out[i, j] = img[r0:r1, c0:c1].mean()
+            if mask is not None:
+                mblock = mask[r0:r1, c0:c1]
+                nonzero = mblock[mblock != 0]
+                if nonzero.size:
+                    vals, counts = np.unique(nonzero, return_counts=True)
+                    mask_out[i, j] = vals[np.argmax(counts)]
+    return img_out, mask_out
+
+
 def _block_reduce(img: np.ndarray, mask, out_h: int, out_w: int):
     """Downsample `img` (grayscale, area-averaged per output cell) and `mask`
     (categorical, majority vote among non-background labels present in each
@@ -69,30 +120,16 @@ def _block_reduce(img: np.ndarray, mask, out_h: int, out_w: int):
     sampled index, and the grayscale background is properly anti-aliased
     instead of looking speckled at low output resolution.
     """
-    h, w = img.shape
-    out_h = max(1, min(out_h, h))
-    out_w = max(1, min(out_w, w))
-    row_edges = np.linspace(0, h, out_h + 1).astype(int)
-    col_edges = np.linspace(0, w, out_w + 1).astype(int)
-
-    img_out = np.zeros((out_h, out_w), dtype=np.float64)
-    mask_out = np.zeros((out_h, out_w), dtype=mask.dtype) if mask is not None else None
-
-    for i in range(out_h):
-        r0, r1 = row_edges[i], max(row_edges[i] + 1, row_edges[i + 1])
-        for j in range(out_w):
-            c0, c1 = col_edges[j], max(col_edges[j] + 1, col_edges[j + 1])
-            img_out[i, j] = img[r0:r1, c0:c1].mean()
-            if mask is not None:
-                mblock = mask[r0:r1, c0:c1]
-                nonzero = mblock[mblock != 0]
-                if nonzero.size:
-                    vals, counts = np.unique(nonzero, return_counts=True)
-                    mask_out[i, j] = vals[np.argmax(counts)]
-    return img_out, mask_out
+    row_edges, col_edges = _compute_edges(*img.shape, out_h, out_w)
+    return _block_reduce_with_edges(img, mask, row_edges, col_edges)
 
 
-def _pixel_rgb(gray_value, label) -> tuple:
+def _pixel_rgb(gray_value, label, annotation_label=ANNOTATION_UNLABELED) -> tuple:
+    # Annotation seed paint takes visual priority -- it's the thing the user
+    # is actively editing, and must stay visible even over an existing
+    # segmentation-result overlay.
+    if annotation_label in ANNOTATION_COLORS:
+        return ANNOTATION_COLORS[annotation_label]
     if label in LABEL_COLORS:
         return LABEL_COLORS[label]
     g = int(gray_value)
@@ -122,6 +159,8 @@ class SliceViewer(Static):
     }
     """
 
+    can_focus = True  # needed to receive key events for f/b/c while annotating
+
     axis = reactive(2)
     slice_idx = reactive(0)
 
@@ -130,12 +169,70 @@ class SliceViewer(Static):
         self.volume: np.ndarray | None = None
         self.mask: np.ndarray | None = None
 
+        # Annotation (graph-cut seed) state -- see enable_annotation_mode().
+        # annotation_mask is the same shape as volume: 0 everywhere except
+        # the handful of slices the user has actually painted.
+        self.annotation_mask: np.ndarray | None = None
+        self.annotation_enabled: bool = False
+        self.paint_label: int = ANNOTATION_FOREGROUND
+        self._dragging: bool = False
+
+        # Set on every render(); used to map a mouse click's character-cell
+        # position back to the exact source-image region that cell's color
+        # was reduced from. A terminal mouse event only reports which
+        # character cell was clicked -- not a sub-cell pixel position -- so a
+        # single click paints the *entire* source region (both the top and
+        # bottom image-rows) that character's half-block glyph represents.
+        self._row_edges: np.ndarray | None = None
+        self._col_edges: np.ndarray | None = None
+
     def set_volume(self, volume: np.ndarray, mask: np.ndarray | None = None) -> None:
         self.volume = volume
         self.mask = mask
         self.axis = 2
         self.slice_idx = volume.shape[2] // 2
         self.refresh()
+
+    def enable_annotation_mode(self) -> None:
+        """Start graph-cut seed painting. Requires set_volume() to have been
+        called first. Safe to call again to just reset all painted seeds."""
+        if self.volume is None:
+            raise RuntimeError("enable_annotation_mode() requires set_volume() first")
+        self.annotation_mask = np.zeros(self.volume.shape, dtype=np.uint8)
+        self.annotation_enabled = True
+        self.refresh()
+
+    def disable_annotation_mode(self) -> None:
+        self.annotation_enabled = False
+        self.refresh()
+
+    def set_paint_label(self, label: int) -> None:
+        if label not in (ANNOTATION_FOREGROUND, ANNOTATION_BACKGROUND):
+            raise ValueError(f"paint_label must be ANNOTATION_FOREGROUND or ANNOTATION_BACKGROUND, got {label!r}")
+        self.paint_label = label
+
+    def clear_annotation_slice(self) -> None:
+        """Erase every seed painted on the currently-displayed slice only."""
+        if self.annotation_mask is None:
+            return
+        idx = min(self.slice_idx, self.annotation_mask.shape[self.axis] - 1)
+        if self.axis == 0:
+            self.annotation_mask[idx, :, :] = ANNOTATION_UNLABELED
+        elif self.axis == 1:
+            self.annotation_mask[:, idx, :] = ANNOTATION_UNLABELED
+        else:
+            self.annotation_mask[:, :, idx] = ANNOTATION_UNLABELED
+        self.refresh()
+
+    def annotated_slice_count(self) -> int:
+        """How many distinct slices (along the current axis) have at least
+        one painted seed voxel -- used to show progress against the ~6-7
+        slices FemurSegmentation's own docs recommend labeling."""
+        if self.annotation_mask is None:
+            return 0
+        has_label = self.annotation_mask != ANNOTATION_UNLABELED
+        other_axes = tuple(a for a in range(3) if a != self.axis)
+        return int(np.count_nonzero(has_label.any(axis=other_axes)))
 
     def scrub(self, delta: int) -> None:
         if self.volume is None:
@@ -163,12 +260,82 @@ class SliceViewer(Static):
             return arr[:, idx, :]
         return arr[:, :, idx]
 
+    def _paint_full_res_region(self, r0: int, r1: int, c0: int, c1: int) -> None:
+        """Write self.paint_label into the annotation mask's *current* slice,
+        over the full-resolution source region [r0:r1, c0:c1] -- the region
+        one clicked character cell was reduced from (see _row_edges/_col_edges)."""
+        idx = min(self.slice_idx, self.annotation_mask.shape[self.axis] - 1)
+        if self.axis == 0:
+            self.annotation_mask[idx, r0:r1, c0:c1] = self.paint_label
+        elif self.axis == 1:
+            self.annotation_mask[r0:r1, idx, c0:c1] = self.paint_label
+        else:
+            self.annotation_mask[r0:r1, c0:c1, idx] = self.paint_label
+
+    def _paint_at_screen_pos(self, x: int, y: int) -> None:
+        """x, y are character-cell coordinates relative to this widget's own
+        content region (Textual delivers mouse events already offset this
+        way). y indexes character *rows*; each one covers two image rows
+        (see _row_edges, built at 2x the character-row count)."""
+        if not self.annotation_enabled or self.annotation_mask is None:
+            return
+        if self._row_edges is None or self._col_edges is None:
+            return
+        char_row, char_col = y, x
+        top_row = char_row * 2
+        bot_row = top_row + 1
+        if char_col < 0 or char_col + 1 >= len(self._col_edges):
+            return
+        if top_row < 0 or bot_row + 1 >= len(self._row_edges):
+            return
+        r0 = self._row_edges[top_row]
+        r1 = self._row_edges[bot_row + 1]
+        c0 = self._col_edges[char_col]
+        c1 = self._col_edges[char_col + 1]
+        if r1 <= r0 or c1 <= c0:
+            return
+        self._paint_full_res_region(r0, r1, c0, c1)
+        self.refresh()
+
+    def on_mouse_down(self, event: events.MouseDown) -> None:
+        if not self.annotation_enabled:
+            return
+        self._dragging = True
+        self.capture_mouse()
+        self._paint_at_screen_pos(event.x, event.y)
+
+    def on_mouse_move(self, event: events.MouseMove) -> None:
+        if not self.annotation_enabled or not self._dragging:
+            return
+        self._paint_at_screen_pos(event.x, event.y)
+
+    def on_mouse_up(self, event: events.MouseUp) -> None:
+        if self._dragging:
+            self._dragging = False
+            self.release_mouse()
+
+    def on_key(self, event: events.Key) -> None:
+        if not self.annotation_enabled:
+            return
+        if event.key == "f":
+            self.set_paint_label(ANNOTATION_FOREGROUND)
+            self.refresh()
+            event.stop()
+        elif event.key == "b":
+            self.set_paint_label(ANNOTATION_BACKGROUND)
+            self.refresh()
+            event.stop()
+        elif event.key == "c":
+            self.clear_annotation_slice()
+            event.stop()
+
     def render(self) -> Text:
         if self.volume is None:
             return Text("No scan loaded yet.", justify="center")
 
         img = self._take_slice(self.volume)
         mask = self._take_slice(self.mask) if self.mask is not None else None
+        annotation = self._take_slice(self.annotation_mask) if self.annotation_mask is not None else None
 
         width = max(20, self.size.width - 2)
         height_chars = max(10, self.size.height - 2)
@@ -176,7 +343,11 @@ class SliceViewer(Static):
         # sample twice as many image rows as there are character rows.
         height = height_chars * 2
 
-        gray_full, mask_ds = _block_reduce(img, mask, height, width)
+        row_edges, col_edges = _compute_edges(*img.shape, height, width)
+        self._row_edges, self._col_edges = row_edges, col_edges
+
+        gray_full, mask_ds = _block_reduce_with_edges(img, mask, row_edges, col_edges)
+        _, annotation_ds = _block_reduce_with_edges(None, annotation, row_edges, col_edges)
         clipped = np.clip(gray_full, HU_WINDOW_MIN, HU_WINDOW_MAX)
         gray = ((clipped - HU_WINDOW_MIN) / (HU_WINDOW_MAX - HU_WINDOW_MIN) * 255).astype(np.uint8)
 
@@ -188,6 +359,8 @@ class SliceViewer(Static):
             gray = np.vstack([gray, gray[-1:]])
             if mask_ds is not None:
                 mask_ds = np.vstack([mask_ds, mask_ds[-1:]])
+            if annotation_ds is not None:
+                annotation_ds = np.vstack([annotation_ds, annotation_ds[-1:]])
             n_rows += 1
 
         text = Text()
@@ -195,8 +368,10 @@ class SliceViewer(Static):
             for c in range(gray.shape[1]):
                 top_label = int(mask_ds[r, c]) if mask_ds is not None else 0
                 bot_label = int(mask_ds[r + 1, c]) if mask_ds is not None else 0
-                top = _pixel_rgb(gray[r, c], top_label)
-                bot = _pixel_rgb(gray[r + 1, c], bot_label)
+                top_ann = int(annotation_ds[r, c]) if annotation_ds is not None else ANNOTATION_UNLABELED
+                bot_ann = int(annotation_ds[r + 1, c]) if annotation_ds is not None else ANNOTATION_UNLABELED
+                top = _pixel_rgb(gray[r, c], top_label, top_ann)
+                bot = _pixel_rgb(gray[r + 1, c], bot_label, bot_ann)
                 style = Style(color=f"rgb({top[0]},{top[1]},{top[2]})",
                              bgcolor=f"rgb({bot[0]},{bot[1]},{bot[2]})")
                 text.append(_HALF_BLOCK, style=style)
@@ -205,4 +380,8 @@ class SliceViewer(Static):
         axis_name = ["sagittal", "coronal", "axial"][self.axis]
         text.append(f"\n{axis_name}  slice {self.slice_idx}/{self.volume.shape[self.axis] - 1}"
                      f"   ([/][ ]/[)] scrub  (tab) cycle axis", style="dim")
+        if self.annotation_enabled:
+            paint_name = "femur" if self.paint_label == ANNOTATION_FOREGROUND else "background"
+            text.append(f"\n[paint: {paint_name}]  {self.annotated_slice_count()} slice(s) annotated"
+                         f"   (click+drag) paint  (f/b) switch label  (c) clear slice", style="dim")
         return text
