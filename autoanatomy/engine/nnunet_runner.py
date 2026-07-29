@@ -35,7 +35,7 @@ from autoanatomy.engine.custom_trainers import (nnUNetTrainer_MOSAIC_1k_QuarterL
                                               nnUNetTrainerDiceTopK10Loss_2000epochs,
                                               nnUNetTrainerSkeletonRecall)
 from autoanatomy.engine.nnunet_runtime_patches import patch_nnunet_cropped_logits_resampling
-from autoanatomy.engine.progress import patch_tqdm_progress
+from autoanatomy.engine.progress import patch_tqdm_progress, measure_flops_per_tile, set_flops_per_unit
 
 custom_trainers = {
     "nnUNetTrainer_MOSAIC_1k_QuarterLR_NoMirroring": nnUNetTrainer_MOSAIC_1k_QuarterLR_NoMirroring,
@@ -312,6 +312,7 @@ def nnUNetv2_predict(dir_in, dir_out, task_id, model="3d_fullres", folds=None,
         use_folds=folds,
         checkpoint_name=chk,
     )
+    set_flops_per_unit(measure_flops_per_tile(predictor))
     if low_memory:
         # Runs prediction + export in this same process, one case at a time --
         # no background multiprocessing.Pool, so no worker process to send the

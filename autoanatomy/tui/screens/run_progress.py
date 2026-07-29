@@ -2,6 +2,7 @@ import io
 import shutil
 import sys
 import threading
+import time
 import traceback
 from contextlib import contextmanager
 
@@ -76,6 +77,7 @@ class RunProgressScreen(Screen):
             )
             yield Static("", id="progress-phase", classes="hint")
             yield ProgressBar(id="task-progress", show_eta=True)
+            yield Static("", id="tflops-readout", classes="hint")
             yield RichLog(id="progress-log", wrap=True, highlight=False)
             yield Button("Back to Home", id="back-btn", disabled=True)
         yield Footer()
@@ -89,8 +91,11 @@ class RunProgressScreen(Screen):
     def _reset_progress(self, phase: str) -> None:
         self.query_one("#progress-phase", Static).update(phase)
         self.query_one("#task-progress", ProgressBar).update(total=None, progress=0)
+        self.query_one("#tflops-readout", Static).update("")
+        self._tflops_last_time = None
+        self._tflops_last_completed = 0
 
-    def _on_progress(self, completed: int, total: int, desc: str | None) -> None:
+    def _on_progress(self, completed: int, total: int, desc: str | None, flops_per_unit: float | None) -> None:
         bar = self.query_one("#task-progress", ProgressBar)
         # desc is nnU-Net's own tqdm description ("Collecting results" for the
         # background export step; None for the main per-tile prediction loop) --
@@ -100,6 +105,18 @@ class RunProgressScreen(Screen):
             bar.update(total=total, progress=completed)
         else:
             bar.update(total=None)
+
+        now = time.perf_counter()
+        last_time = getattr(self, "_tflops_last_time", None)
+        last_completed = getattr(self, "_tflops_last_completed", 0)
+        readout = self.query_one("#tflops-readout", Static)
+        if flops_per_unit and last_time is not None and completed > last_completed:
+            elapsed = now - last_time
+            if elapsed > 1e-6:
+                tflops = flops_per_unit * (completed - last_completed) / elapsed / 1e12
+                readout.update(f"{tflops:.2f} TFLOPS")
+        self._tflops_last_time = now
+        self._tflops_last_completed = completed
 
     @work(thread=True)
     def run_segmentation(self) -> None:
@@ -140,8 +157,8 @@ class RunProgressScreen(Screen):
                 mirroring=app.mirroring,
             )
 
-        def _progress_callback(completed, total, desc):
-            app.call_from_thread(self._on_progress, completed, total, desc)
+        def _progress_callback(completed, total, desc, flops_per_unit):
+            app.call_from_thread(self._on_progress, completed, total, desc, flops_per_unit)
 
         stream = _StreamToLog(self, threading.current_thread(), sys.stdout)
         try:
