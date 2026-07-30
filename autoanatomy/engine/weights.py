@@ -1,0 +1,271 @@
+import io
+import os
+import contextlib
+import sys
+import time
+import zipfile
+from pathlib import Path
+
+from tqdm import tqdm
+import requests
+import numpy as np
+import nibabel as nib
+
+from autoanatomy.engine.class_map import class_map, class_map_5_parts
+from autoanatomy.engine.config import get_weights_dir
+from autoanatomy.engine.nifti_ext_header import load_multilabel_nifti, add_label_map_to_nifti
+
+
+"""
+Helpers to suppress stdout prints from nnunet
+https://stackoverflow.com/questions/2828953/silence-the-stdout-of-a-function-in-python-without-trashing-sys-stdout-and-resto
+"""
+class DummyFile:
+    def write(self, x): pass
+    def flush(self): pass
+
+@contextlib.contextmanager
+def nostdout(verbose=False):
+    if not verbose:
+        save_stdout = sys.stdout
+        sys.stdout = DummyFile()
+        try:
+            yield
+        finally:
+            sys.stdout = save_stdout
+    else:
+        yield
+
+
+def download_url_and_unpack(url, config_dir):
+
+    # Not needed anymore since downloading from github assets (actually results in an error)
+    # if "TOTALSEG_DISABLE_HTTP1" in os.environ and os.environ["TOTALSEG_DISABLE_HTTP1"]:
+    #     print("Disabling HTTP/1.0")
+    # else:
+    #     import http.client
+    #     # helps to solve incomplete read errors
+    #     # https://stackoverflow.com/questions/37816596/restrict-request-to-only-ask-for-http-1-0-to-prevent-chunking-error
+    #     http.client.HTTPConnection._http_vsn = 10
+    #     http.client.HTTPConnection._http_vsn_str = 'HTTP/1.0'
+
+    tempfile = config_dir / "tmp_download_file.zip"
+
+    try:
+        st = time.time()
+        with open(tempfile, 'wb') as f:
+            # session = requests.Session()  # making it slower
+
+            with requests.get(url, stream=True) as r:
+                r.raise_for_status()
+
+                # With progress bar
+                total_size = int(r.headers.get('content-length', 0))
+                progress_bar = tqdm(total=total_size, unit='B', unit_scale=True, desc="Downloading")
+                for chunk in r.iter_content(chunk_size=8192 * 16):
+                    progress_bar.update(len(chunk))
+                    f.write(chunk)
+                progress_bar.close()
+
+        print("Download finished. Extracting...")
+        # call(['unzip', '-o', '-d', network_training_output_dir, tempfile])
+        with zipfile.ZipFile(config_dir / "tmp_download_file.zip", 'r') as zip_f:
+            zip_f.extractall(config_dir)
+        # print(f"  downloaded in {time.time()-st:.2f}s")
+    except Exception as e:
+        raise e
+    finally:
+        if tempfile.exists():
+            os.remove(tempfile)
+
+
+# task_id -> the folder name it unpacks to under the weights dir. Shared by
+# download_pretrained_weights (below) and cli.main's download-weights/check
+# commands, so cache-status reporting can't drift out of sync with what
+# actually gets downloaded.
+WEIGHTS_FOLDER_NAMES = {
+    297: "Dataset297_TotalSegmentator_total_3mm_1559subj",
+    298: "Dataset298_TotalSegmentator_total_6mm_1559subj",
+    294: "Dataset294_TotalSegmentator_part4_muscles_1559subj",
+    777: "Dataset777_head_muscles_492subj",
+    112: "Dataset112_DentalSegmentator_v100",
+    778: "Dataset778_headneck_muscles_part1_492subj",
+    779: "Dataset779_headneck_muscles_part2_492subj",
+}
+
+
+def download_pretrained_weights(task_id):
+
+    config_dir = get_weights_dir()
+    config_dir.mkdir(exist_ok=True, parents=True)
+
+    # Model weights are hosted on the upstream project's GitHub releases --
+    # this is a real, required download URL, not a display name.
+    url = "https://github.com/wasserth/TotalSegmentator/releases/download"
+
+    if task_id == 297:
+        weights_path = config_dir / "Dataset297_TotalSegmentator_total_3mm_1559subj"
+        WEIGHTS_URL = url + "/v2.0.0-weights/Dataset297_TotalSegmentator_total_3mm_1559subj.zip"
+    elif task_id == 298:
+        weights_path = config_dir / "Dataset298_TotalSegmentator_total_6mm_1559subj"
+        WEIGHTS_URL = url + "/v2.0.0-weights/Dataset298_TotalSegmentator_total_6mm_1559subj.zip"
+    elif task_id == 294:
+        # The "total" task's full 1.5mm resolution is normally an ensemble of 5
+        # part-models (291-295); "skull" only lives in this one (part4, muscles),
+        # so the 1.5mm crop tier downloads just this single part instead of all 5.
+        weights_path = config_dir / "Dataset294_TotalSegmentator_part4_muscles_1559subj"
+        WEIGHTS_URL = url + "/v2.0.0-weights/Dataset294_TotalSegmentator_part4_muscles_1559subj.zip"
+    elif task_id == 777:
+        weights_path = config_dir / "Dataset777_head_muscles_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset777_head_muscles_492subj.zip"
+    elif task_id == 112:
+        # DentalSegmentator (Dot et al., J Dentistry 2024) -- an independently
+        # published, CC-BY 4.0 nnU-Net v2 checkpoint, not part of upstream
+        # TotalSegmentator. All five of its classes are exposed by
+        # class_map["dental_segmentator"], including "upper_teeth"/
+        # "lower_teeth".
+        weights_path = config_dir / "Dataset112_DentalSegmentator_v100"
+        WEIGHTS_URL = "https://zenodo.org/records/10829675/files/Dataset112_DentalSegmentator_v100.zip"
+    elif task_id == 778:
+        weights_path = config_dir / "Dataset778_headneck_muscles_part1_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset778_headneck_muscles_part1_492subj.zip"
+    elif task_id == 779:
+        weights_path = config_dir / "Dataset779_headneck_muscles_part2_492subj"
+        WEIGHTS_URL = url + "/v2.3.0-weights/Dataset779_headneck_muscles_part2_492subj.zip"
+    else:
+        raise ValueError(f"For task_id {task_id} no download path was found.")
+
+
+    if not weights_path.exists():
+        print(f"Downloading model for Task {task_id} ...")
+        weights_path.parent.mkdir(exist_ok=True, parents=True)
+        download_url_and_unpack(WEIGHTS_URL, weights_path.parent)
+
+
+def combine_masks_to_multilabel_file(masks_dir, multilabel_file):
+    """
+    Generate one multilabel nifti file from a directory of single binary masks of each class.
+    This multilabel file is needed to train a nnU-Net.
+
+    masks_dir: path to directory containing all the masks for one subject
+    multilabel_file: path of the output file (a nifti file)
+    """
+    masks_dir = Path(masks_dir)
+    ref_img = nib.load(masks_dir / "liver.nii.gz")
+    masks = class_map["total"].values()
+    img_out = np.zeros(ref_img.shape).astype(np.uint8)
+
+    for idx, mask in enumerate(masks):
+        if os.path.exists(f"{masks_dir}/{mask}.nii.gz"):
+            img = nib.load(f"{masks_dir}/{mask}.nii.gz").get_fdata()
+        else:
+            print(f"Mask {mask} is missing. Filling with zeros.")
+            img = np.zeros(ref_img.shape)
+        img_out[img > 0.5] = idx+1
+
+    nib.save(nib.Nifti1Image(img_out, ref_img.affine), multilabel_file)
+
+
+def combine_masks(mask_dir, class_type, multilabel=False):
+    """
+    Combine classes to masks
+
+    mask_dir: directory of totalsegmetator masks or path to a multilabel nifti file
+    class_type: ribs | vertebrae | vertebrae_ribs | lung | heart | list of custom class names
+    multilabel: if True, the output mask is a multilabel nifti file
+
+    returns: nibabel image
+    """
+    rib_classes = [f"rib_left_{idx}" for idx in range(1, 13)] + [f"rib_right_{idx}" for idx in range(1, 13)]  # + ["sternum",]
+    if class_type == "ribs":
+        masks = rib_classes
+    elif class_type == "vertebrae":
+        masks = list(class_map_5_parts["class_map_part_vertebrae"].values())
+    elif class_type == "vertebrae_ribs":
+        masks = list(class_map_5_parts["class_map_part_vertebrae"].values()) + rib_classes
+    elif class_type == "lung":
+        masks = ["lung_upper_lobe_left", "lung_lower_lobe_left", "lung_upper_lobe_right",
+                 "lung_middle_lobe_right", "lung_lower_lobe_right"]
+    elif class_type == "lung_left":
+        masks = ["lung_upper_lobe_left", "lung_lower_lobe_left"]
+    elif class_type == "lung_right":
+        masks = ["lung_upper_lobe_right", "lung_middle_lobe_right", "lung_lower_lobe_right"]
+    elif class_type == "pelvis":
+        masks = ["femur_left", "femur_right", "hip_left", "hip_right"]
+    elif class_type == "body":
+        masks = ["body_trunc", "body_extremities"]
+    else:
+        masks = class_type
+
+    if mask_dir.is_file():
+        img, label_map = load_multilabel_nifti(mask_dir)  # label_map: {id:name}
+        label_map_inv = {name: id for id, name in label_map.items()}
+        target_label_ids = [label_map_inv[mask_name] for mask_name in masks]
+        img_data = img.get_fdata()
+        combined = np.zeros(img_data.shape, dtype=np.uint8)
+        for label_id in target_label_ids:
+            combined[img_data == label_id] = 1
+        combined_img = nib.Nifti1Image(combined, img.affine)
+    else:
+        ref_img = None
+        for mask in masks:
+            if (mask_dir / f"{mask}.nii.gz").exists():
+                ref_img = nib.load(mask_dir / f"{masks[0]}.nii.gz")
+            else:
+                raise ValueError(f"Could not find {mask_dir / mask}.nii.gz. Did the segmentation run successfully?")
+
+        combined = np.zeros(ref_img.shape, dtype=np.uint8)
+        for idx, mask in enumerate(masks):
+            if (mask_dir / f"{mask}.nii.gz").exists():
+                img = nib.load(mask_dir / f"{mask}.nii.gz").get_fdata()
+                combined[img > 0.5] = 1
+
+        combined_img = nib.Nifti1Image(combined, ref_img.affine)
+
+    if multilabel:
+        combined_img = add_label_map_to_nifti(combined_img, {1: class_type})
+
+    return combined_img
+
+
+def compress_nifti(file_in, file_out, dtype=np.int32, force_3d=True):
+    img = nib.load(file_in)
+    data = img.get_fdata()
+    if force_3d and len(data.shape) > 3:
+        print("Info: Input image contains more than 3 dimensions. Only keeping first 3 dimensions.")
+        data = data[:,:,:,0]
+    new_image = nib.Nifti1Image(data.astype(dtype), img.affine)
+    nib.save(new_image, file_out)
+
+
+def check_if_shape_and_affine_identical(img_1, img_2):
+
+    max_diff = np.abs(img_1.affine - img_2.affine).max()
+    if max_diff > 1e-5:
+        print("Affine in:")
+        print(img_1.affine)
+        print("Affine out:")
+        print(img_2.affine)
+        print("Diff:")
+        print(np.abs(img_1.affine-img_2.affine))
+        print("WARNING: Output affine not equal to input affine. This should not happen.")
+
+    if img_1.shape != img_2.shape:
+        print("Shape in:")
+        print(img_1.shape)
+        print("Shape out:")
+        print(img_2.shape)
+        print("WARNING: Output shape not equal to input shape. This should not happen.")
+
+
+def reorder_multilabel_like_v1(data, label_map_v2, label_map_v1):
+    """
+    Reorder a multilabel image from v2 to v1
+    """
+    label_map_v2_inv = {v: k for k, v in label_map_v2.items()}
+    data_out = np.zeros(data.shape, dtype=np.uint8)
+    for label_id, label_name in label_map_v1.items():
+        if label_name in label_map_v2_inv:
+            data_out[data == label_map_v2_inv[label_name]] = label_id
+        # heart chambers are not in v2 anymore. The results seg will be empty for these classes
+    return data_out

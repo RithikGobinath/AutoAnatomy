@@ -1,0 +1,84 @@
+Screen {
+    background: $surface;
+}
+
+.title-banner {
+    text-style: bold;
+    color: $accent;
+    content-align: center middle;
+    height: auto;
+    padding: 1 0;
+}
+
+.subtitle {
+    color: $text-muted;
+    content-align: center middle;
+    height: auto;
+    padding-bottom: 1;
+}
+
+.panel {
+    border: round $primary;
+    padding: 1 2;
+    margin: 1;
+}
+
+/* Screens whose content can be taller than the terminal (forms, dashboards,
+   multi-panel layouts) apply this to a VerticalScroll wrapper so the content
+   scrolls instead of pushing buttons off-screen with no way to reach them. */
+.scroll-wrapper {
+    height: 1fr;
+    overflow-y: auto;
+}
+
+.roadmap-card {
+    border: round $primary-darken-2;
+    color: $text-muted;
+    padding: 0 1;
+    margin: 0 1 1 0;
+    width: 1fr;
+}
+
+.roadmap-card-title {
+    text-style: bold;
+}
+
+.phase2-badge {
+    color: $warning;
+    text-style: bold italic;
+}
+
+.section-title {
+    text-style: bold underline;
+    padding-bottom: 1;
+}
+
+#home-actions {
+    height: auto;
+    align: center middle;
+    padding: 1 0;
+}
+
+.hint {
+    color: $text-muted;
+    text-style: italic;
+}
+
+.advanced-row {
+    height: 3;
+    align: left middle;
+}
+
+.advanced-row Static {
+    width: 24;
+}
+
+.advanced-row Input {
+    width: 12;
+}
+
+.task-structures {
+    height: auto;
+    padding-left: 4;
+    margin-bottom: 1;
+}

@@ -1,0 +1,27 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# portable build output -- ship via GitHub Releases, not git
+AutoAnatomy-Portable-*.zip
+AutoAnatomy-Portable-*.tar.gz
+
+# model weights + nnU-Net result cache
+.autoanatomy/
+
+# scan data
+*.nii.gz
+*.dcm
+!tests/reference_files/**
+
+# OS
+.DS_Store
+Thumbs.db
+
+# local tooling / build scratch, not part of the source tree
+.claude/
+release_build/
