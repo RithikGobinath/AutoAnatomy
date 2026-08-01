@@ -50,6 +50,12 @@ LABEL_COLORS = {
     205: (154, 205, 50),   # yellow green
 }
 
+# Femur semi-automatic graph-cut result (autoanatomy.engine.femur_semiauto):
+# a single binary mask, not a nnU-Net task with its own class_map/display
+# offset -- reserve one fixed display id for it instead.
+FEMUR_RESULT_DISPLAY_ID = 901
+LABEL_COLORS[FEMUR_RESULT_DISPLAY_ID] = (255, 215, 0)  # gold
+
 
 def _headneck_muscles_colors():
     """headneck_muscles has 23 structures (display IDs 301-323) -- too many

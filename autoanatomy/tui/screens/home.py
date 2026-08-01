@@ -11,7 +11,11 @@ ROADMAP = [
 
 
 class HomeScreen(Screen):
-    BINDINGS = [("n", "new_run", "New Segmentation"), ("escape", "app.pop_screen", "Back")]
+    BINDINGS = [
+        ("n", "new_run", "New Segmentation"),
+        ("f", "femur_run", "Femur (semi-auto)"),
+        ("escape", "app.pop_screen", "Back"),
+    ]
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -21,6 +25,7 @@ class HomeScreen(Screen):
                 yield Static("What do you want to do?", classes="section-title")
                 with Horizontal(id="home-actions"):
                     yield Button("New Segmentation  (n)", id="new-run", variant="primary")
+                    yield Button("Femur (semi-auto)  (f)", id="femur-run")
                     yield Button("Settings", id="settings")
                     yield Button("Quit", id="quit", variant="error")
 
@@ -37,6 +42,8 @@ class HomeScreen(Screen):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         if event.button.id == "new-run":
             self.action_new_run()
+        elif event.button.id == "femur-run":
+            self.action_femur_run()
         elif event.button.id == "settings":
             from autoanatomy.tui.screens.settings import SettingsScreen
             self.app.push_screen(SettingsScreen())
@@ -46,3 +53,8 @@ class HomeScreen(Screen):
     def action_new_run(self) -> None:
         from autoanatomy.tui.screens.load_scan import LoadScanScreen
         self.app.push_screen(LoadScanScreen())
+
+    def action_femur_run(self) -> None:
+        from autoanatomy.tui.screens.femur_semiauto import FemurPaintScreen
+        from autoanatomy.tui.screens.load_scan import LoadScanScreen
+        self.app.push_screen(LoadScanScreen(next_screen_factory=FemurPaintScreen))

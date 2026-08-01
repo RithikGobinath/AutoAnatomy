@@ -18,6 +18,10 @@ AutoAnatomy-Portable-*.tar.gz
 *.dcm
 !tests/reference_files/**
 
+# Cython-generated C++ (regenerated from native_src/src/graphcut.pyx by
+# third_party/femur_segmentation/build_extension.py)
+autoanatomy/third_party/femur_segmentation/native_src/src/graphcut.cpp
+
 # OS
 .DS_Store
 Thumbs.db
