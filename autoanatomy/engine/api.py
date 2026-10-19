@@ -301,6 +301,26 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         model = "3d_fullres_high"
         folds = [0]
         if fast: raise ValueError("task headneck_muscles does not work with option --fast")
+    elif task == "individual_teeth":
+        # Fourth AutoAnatomy product task: 32 individual permanent teeth by
+        # FDI number, built on two ToothSeg nnU-Net checkpoints (MIC-DKFZ,
+        # Apache-2.0). This is a two-model pipeline (semantic + instance
+        # branches, combined via connected-component instance decoding and
+        # majority-vote label assignment) that doesn't fit this function's
+        # generic single-trainer/single-spacing multimodel path -- see
+        # engine/individual_teeth.py's run_individual_teeth(), called below
+        # instead of nnUNet_predict_image for this task only. task_id is
+        # still set to both checkpoint ids so the weight-download loop further
+        # down (shared by every task) fetches them.
+        task_id = [121, 123]
+        resample = None
+        trainer = None
+        crop = None
+        model = None
+        folds = None
+        if fast: raise ValueError("task individual_teeth does not work with option --fast")
+        if output_type != "nifti":
+            raise ValueError("task individual_teeth only supports output_type='nifti' in this build.")
     else:
         raise ValueError(
             f"Unknown task '{task}'. This build of AutoAnatomy only supports "
@@ -308,7 +328,8 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
             "mandibular_canal), task='head_muscles' (masseter, temporalis, pterygoids, "
             "tongue, digastric), or task='headneck_muscles' (sternocleidomastoid, "
             "pharyngeal constrictors, trapezius, platysma, levator scapulae, scalenes, "
-            "sterno-thyroid, thyrohyoid, prevertebral -- license required for commercial use)."
+            "sterno-thyroid, thyrohyoid, prevertebral -- license required for commercial use), "
+            "or task='individual_teeth' (32 individual permanent teeth by FDI number)."
         )
 
     # mirroring=None keeps each task's own default above (dental_segmentator:
@@ -494,25 +515,33 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
         if verbose: print(f"Vertebrae body mask generated in {time.time()-st:.2f}s")
 
     prediction_task = "vertebrae_pp" if task == "vertebrae_pp_refined" else task
-    seg_img, ct_img, stats = nnUNet_predict_image(input, output, task_id, model=model, folds=folds,
-                            trainer=trainer, tta=tta, multilabel_image=ml, resample=resample,
-                            crop=crop, crop_path=crop_path, task_name=prediction_task, nora_tag=nora_tag, preview=preview,
-                            nr_threads_resampling=nr_thr_resamp, nr_threads_saving=nr_thr_saving,
-                            force_split=force_split, crop_addon=crop_addon, roi_subset=roi_subset,
-                            output_type=output_type, statistics=statistics_fast,
-                            quiet=quiet, verbose=verbose, test=test, skip_saving=skip_saving, device=device,
-                            exclude_masks_at_border=statistics_exclude_masks_at_border,
-                            no_derived_masks=no_derived_masks, v1_order=v1_order,
-                            stats_aggregation=stats_aggregation, remove_small_blobs=remove_small_blobs,
-                            normalized_intensities=statistics_normalized_intensities,
-                            higher_order_resampling_LEGACY=higher_order_resampling_LEGACY,
-                            save_probabilities=save_probabilities,
-                            cascade=cascade, remove_outside_mask=remove_mask, remove_outside_dilation=remove_outside_dilation,
-                            debug=debug, save_lowres=save_lowres and (fast or fastest),
-                            resampling_order=resampling_order, plans=plans,
-                            vertebrae_body_mask=vertebrae_body_mask, output_task_name=task,
-                            use_cropped_logits_resampling=higher_order_resampling, low_memory=low_memory,
-                            step_size=step_size)
+    if task == "individual_teeth":
+        from autoanatomy.engine.individual_teeth import run_individual_teeth
+        seg_img, ct_img, stats = run_individual_teeth(input, output, multilabel_image=ml, roi_subset=roi_subset,
+                                output_type=output_type, nora_tag=nora_tag, quiet=quiet, verbose=verbose,
+                                skip_saving=skip_saving, device=device, debug=debug,
+                                nr_threads_resampling=nr_thr_resamp, nr_threads_saving=nr_thr_saving,
+                                tta=tta, statistics=statistics_fast)
+    else:
+        seg_img, ct_img, stats = nnUNet_predict_image(input, output, task_id, model=model, folds=folds,
+                                trainer=trainer, tta=tta, multilabel_image=ml, resample=resample,
+                                crop=crop, crop_path=crop_path, task_name=prediction_task, nora_tag=nora_tag, preview=preview,
+                                nr_threads_resampling=nr_thr_resamp, nr_threads_saving=nr_thr_saving,
+                                force_split=force_split, crop_addon=crop_addon, roi_subset=roi_subset,
+                                output_type=output_type, statistics=statistics_fast,
+                                quiet=quiet, verbose=verbose, test=test, skip_saving=skip_saving, device=device,
+                                exclude_masks_at_border=statistics_exclude_masks_at_border,
+                                no_derived_masks=no_derived_masks, v1_order=v1_order,
+                                stats_aggregation=stats_aggregation, remove_small_blobs=remove_small_blobs,
+                                normalized_intensities=statistics_normalized_intensities,
+                                higher_order_resampling_LEGACY=higher_order_resampling_LEGACY,
+                                save_probabilities=save_probabilities,
+                                cascade=cascade, remove_outside_mask=remove_mask, remove_outside_dilation=remove_outside_dilation,
+                                debug=debug, save_lowres=save_lowres and (fast or fastest),
+                                resampling_order=resampling_order, plans=plans,
+                                vertebrae_body_mask=vertebrae_body_mask, output_task_name=task,
+                                use_cropped_logits_resampling=higher_order_resampling, low_memory=low_memory,
+                                step_size=step_size)
     seg = seg_img.get_fdata().astype(np.uint8)
 
     try:

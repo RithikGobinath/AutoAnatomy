@@ -1,6 +1,7 @@
 import io
 import os
 import contextlib
+import shutil
 import sys
 import time
 import zipfile
@@ -91,7 +92,34 @@ WEIGHTS_FOLDER_NAMES = {
     112: "Dataset112_DentalSegmentator_v100",
     778: "Dataset778_headneck_muscles_part1_492subj",
     779: "Dataset779_headneck_muscles_part2_492subj",
+    121: "Dataset121_ToothFairy2_Teeth",
+    123: "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px",
 }
+
+
+def _download_toothseg_weights(config_dir):
+    """Download+unpack ToothSeg's combined checkpoint archive (Hanisch et al.,
+    MIC-DKFZ; Apache-2.0) for AutoAnatomy's individual_teeth task.
+
+    Both of that task's checkpoints (121 semantic, 123 instance) ship bundled
+    together in one Zenodo record, wrapped in a top-level "ToothSeg/" folder
+    -- unlike every other entry in WEIGHTS_FOLDER_NAMES, which each get their
+    own zip unpacking directly to their final folder name. So this unpacks
+    once and then flattens that wrapper, moving both Dataset folders up to
+    sit directly under config_dir like every other cached checkpoint.
+    Called by whichever of the two task_ids is requested first; the other
+    then finds its folder already present and is a no-op.
+    """
+    url = "https://zenodo.org/api/records/14893540/files/ToothSeg.zip/content"
+    download_url_and_unpack(url, config_dir)
+    wrapper = config_dir / "ToothSeg"
+    for ds_id in (121, 123):
+        src = wrapper / WEIGHTS_FOLDER_NAMES[ds_id]
+        dst = config_dir / WEIGHTS_FOLDER_NAMES[ds_id]
+        if src.exists() and not dst.exists():
+            shutil.move(str(src), str(dst))
+    if wrapper.exists():
+        shutil.rmtree(wrapper, ignore_errors=True)
 
 
 def download_pretrained_weights(task_id):
@@ -132,6 +160,13 @@ def download_pretrained_weights(task_id):
     elif task_id == 779:
         weights_path = config_dir / "Dataset779_headneck_muscles_part2_492subj"
         WEIGHTS_URL = url + "/v2.3.0-weights/Dataset779_headneck_muscles_part2_492subj.zip"
+    elif task_id in (121, 123):
+        weights_path = config_dir / WEIGHTS_FOLDER_NAMES[task_id]
+        if not weights_path.exists():
+            print(f"Downloading model for Task {task_id} ...")
+            weights_path.parent.mkdir(exist_ok=True, parents=True)
+            _download_toothseg_weights(weights_path.parent)
+        return
     else:
         raise ValueError(f"For task_id {task_id} no download path was found.")
 

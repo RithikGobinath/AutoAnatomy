@@ -192,6 +192,54 @@ class_map = {
         22: "prevertebral_right",
         23: "prevertebral_left",
     },
+
+    # Fourth AutoAnatomy product task: the 32 individual permanent teeth, by
+    # FDI two-digit tooth number. Built on two ToothSeg nnU-Net v2 checkpoints
+    # (Hanisch et al., MIC-DKFZ; Apache-2.0; Dataset121_ToothFairy2_Teeth +
+    # Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px, both trained on the
+    # ToothFairy2 Challenge dataset) -- see engine/individual_teeth.py for how
+    # the two checkpoints are combined into this single per-tooth labeling.
+    # Only this one capability was taken from ToothSeg: no maxilla/mandible/
+    # mandibular-canal classes (dental_segmentator already covers those) and
+    # no other ToothSeg output.
+    #
+    # Ids follow Dataset121's own label order, which is already FDI-quadrant
+    # order (upper-right, upper-left, lower-left, lower-right, each
+    # incisor-to-third-molar) -- id -> FDI is ((id-1)//8 + 1)*10 + (id-1)%8+1.
+    "individual_teeth": {
+        1: "tooth_11",
+        2: "tooth_12",
+        3: "tooth_13",
+        4: "tooth_14",
+        5: "tooth_15",
+        6: "tooth_16",
+        7: "tooth_17",
+        8: "tooth_18",
+        9: "tooth_21",
+        10: "tooth_22",
+        11: "tooth_23",
+        12: "tooth_24",
+        13: "tooth_25",
+        14: "tooth_26",
+        15: "tooth_27",
+        16: "tooth_28",
+        17: "tooth_31",
+        18: "tooth_32",
+        19: "tooth_33",
+        20: "tooth_34",
+        21: "tooth_35",
+        22: "tooth_36",
+        23: "tooth_37",
+        24: "tooth_38",
+        25: "tooth_41",
+        26: "tooth_42",
+        27: "tooth_43",
+        28: "tooth_44",
+        29: "tooth_45",
+        30: "tooth_46",
+        31: "tooth_47",
+        32: "tooth_48",
+    },
 }
 
 # dental_segmentator and head_muscles are both free for non-commercial and

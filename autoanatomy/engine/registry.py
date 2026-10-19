@@ -24,6 +24,7 @@ TASKS = [
     "dental_segmentator",
     "head_muscles",
     "headneck_muscles",
+    "individual_teeth",
 ]
 
 # task -> the nnU-Net checkpoint task_id(s) it needs downloaded (see
@@ -33,6 +34,7 @@ TASK_WEIGHT_IDS = {
     "dental_segmentator": [112],
     "head_muscles": [777],
     "headneck_muscles": [778, 779],
+    "individual_teeth": [121, 123],
 }
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
@@ -55,6 +57,7 @@ TASK_DISPLAY_OFFSET = {
     "dental_segmentator": 200,
     "head_muscles": 100,
     "headneck_muscles": 300,
+    "individual_teeth": 400,
 }
 
 # Tasks that operate on MR images but whose name does not end in "_mr".
