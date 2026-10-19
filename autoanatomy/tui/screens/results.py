@@ -73,7 +73,7 @@ class ResultsScreen(Screen):
             volume = np.asanyarray(img.dataobj)
 
             multi_task = len(self.app.selected_tasks) > 1
-            combined_mask = np.zeros(volume.shape, dtype=np.uint8)
+            combined_mask = np.zeros(volume.shape, dtype=np.uint16)
 
             for task, roi_subset in self.app.selected_tasks.items():
                 offset = TASK_DISPLAY_OFFSET[task]

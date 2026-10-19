@@ -218,6 +218,25 @@ def segment(input: Union[str, Path, Nifti1Image], output: Union[str, Path, None]
     if model_size == "small" and task != "total_v3":
         raise ValueError("model_size='small' is currently only supported for task 'total_v3'.")
 
+    if task == "auto3dseg_muscles":
+        from autoanatomy.engine.auto3dseg import segment_auto3dseg
+        if fast or fastest or save_lowres:
+            raise ValueError("Auto3DSeg muscles uses its fixed 0.5 mm model; fast modes are unsupported.")
+        if output_type != "nifti":
+            raise ValueError("Auto3DSeg muscles currently supports NIfTI output only.")
+        if radiomics or save_probabilities is not None:
+            raise ValueError("Auto3DSeg muscles does not support radiomics or probability export.")
+        return segment_auto3dseg(
+            input, output, ml=ml, roi_subset=roi_subset, device=device,
+            quiet=quiet, verbose=verbose, statistics=statistics,
+            skip_saving=skip_saving, remove_small_blobs=remove_small_blobs,
+            mirroring=mirroring, report=report,
+            statistics_exclude_masks_at_border=statistics_exclude_masks_at_border,
+            stats_aggregation=stats_aggregation,
+            statistics_normalized_intensities=statistics_normalized_intensities,
+            statistics_extra=statistics_extra,
+        )
+
     setup_nnunet()
     setup_totalseg()
 

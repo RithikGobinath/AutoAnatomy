@@ -48,6 +48,9 @@ LABEL_COLORS = {
     203: (255, 165, 0),    # orange
     204: (50, 205, 50),    # lime green
     205: (154, 205, 50),   # yellow green
+    401: (255, 125, 90),   # Auto3DSeg masseter
+    402: (110, 195, 255),  # Auto3DSeg temporalis
+    403: (195, 145, 255),  # Auto3DSeg medial pterygoid
 }
 
 # Femur semi-automatic graph-cut result (autoanatomy.engine.femur_semiauto):

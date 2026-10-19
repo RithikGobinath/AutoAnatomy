@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autoanatomy"
-version = "0.2.0"
+version = "0.3.0"
 description = "Craniofacial CT segmentation (jaw, teeth, skull, mandibular canal, chewing muscles) with a terminal GUI."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -24,6 +24,7 @@ dependencies = [
     "textual>=0.60",
     "rich",
     "itk>=5.1.0",
+    "monai>=1.6.1,<1.7",
 ]
 
 [project.optional-dependencies]
@@ -41,6 +42,7 @@ include = ["autoanatomy*"]
 
 [tool.setuptools.package-data]
 "autoanatomy.engine" = ["resources/*"]
+"autoanatomy.tui" = ["*.tcss"]
 # The prebuilt graph-cut extension and its native rebuild sources (see
 # autoanatomy/third_party/femur_segmentation/README.md) -- not .py files, so
 # they need explicit package-data globs to ship in a built wheel.

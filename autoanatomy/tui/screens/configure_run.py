@@ -10,7 +10,7 @@ from textual.widgets import (
 
 from autoanatomy.engine.class_map import class_map
 from autoanatomy.engine.parallel_runner import DEFAULT_MAX_PARALLEL_TASKS
-from autoanatomy.engine.registry import TASKS, requires_license
+from autoanatomy.engine.registry import TASKS, TASK_SECTIONS, TASK_TITLES, requires_license
 
 DEFAULT_BLOB_THRESHOLD_MM3 = 200
 DEFAULT_RESAMPLE_THREADS = 1
@@ -25,6 +25,13 @@ def _structure_checkbox_id(name: str) -> str:
 class ConfigureRunScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
+    def __init__(self, auto3dseg_only=False):
+        super().__init__()
+        self.available_tasks = [
+            task for task in TASKS
+            if not auto3dseg_only or TASK_SECTIONS[task] == "Auto3DSeg"
+        ]
+
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(classes="panel scroll-wrapper"):
@@ -32,13 +39,25 @@ class ConfigureRunScreen(Screen):
             yield Static(f"Scan: [b]{self.app.scan_path}[/b]")
 
             yield Static("\nTasks (any combination -- each run independently, results are combined):")
+            section = None
             for i, task in enumerate(TASKS):
+                if task not in self.available_tasks:
+                    continue
+                if TASK_SECTIONS[task] != section:
+                    section = TASK_SECTIONS[task]
+                    yield Static(section, classes="section-title", id=f"section-{section.lower()}")
+                    if section == "Auto3DSeg":
+                        yield Static(
+                            "Each muscle mask includes both left and right sides. "
+                            "Uses the 0.5 mm whole-head model.",
+                            classes="hint",
+                        )
                 # Preserve today's default: only the first task runs unless you
                 # opt in to more -- a second task roughly doubles run time.
-                label = f"Include {task}"
+                label = f"Include {TASK_TITLES.get(task, task)}"
                 if requires_license(task):
                     label += " (license required for commercial use -- see NOTICE)"
-                yield Checkbox(label, value=(i == 0), id=f"task-enable-{i}")
+                yield Checkbox(label, value=(task == self.available_tasks[0]), id=f"task-enable-{i}")
                 with Vertical(id=f"structures-container-{i}", classes="task-structures"):
                     for widget in self._build_structure_checkboxes(task):
                         yield widget
@@ -59,7 +78,7 @@ class ConfigureRunScreen(Screen):
 
             yield Static(
                 "\n[dim]Resampling resolution is fixed per task by the model. --fast is not "
-                "supported for either task in this build (fixed model constraint).[/dim]"
+                "supported for these tasks (fixed model constraint).[/dim]"
             )
 
             with Collapsible(title="Advanced settings", collapsed=True):
@@ -154,6 +173,8 @@ class ConfigureRunScreen(Screen):
         selected_tasks = {}
 
         for i, task in enumerate(TASKS):
+            if task not in self.available_tasks:
+                continue
             if not self.query_one(f"#task-enable-{i}", Checkbox).value:
                 continue
 

@@ -119,6 +119,20 @@ def set_flops_per_unit(value) -> None:
     _flops_per_unit.set(value)
 
 
+def notify_progress(completed, total, description=None):
+    """Report a completed MONAI tile through the existing UI callback."""
+    callback = _active_callback.get()
+    if callback is not None:
+        try:
+            callback(completed, total, description, None)
+        except Exception:
+            pass
+
+
+def has_progress_callback():
+    return _active_callback.get() is not None
+
+
 def measure_flops_per_tile(predictor) -> float | None:
     """Measure the real FLOP cost of running one sliding-window tile through
     `predictor`'s network, including every mirror-TTA variant nnU-Net will
