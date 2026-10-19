@@ -29,6 +29,13 @@ from tqdm import tqdm as _real_tqdm
 
 _active_callback = contextvars.ContextVar("autoanatomy_progress_callback", default=None)
 
+# Real, measured FLOPs for one full unit of the progress counter above (one
+# sliding-window tile, including every mirror-TTA variant that actually runs
+# for it) -- see measure_flops_per_tile(). None means "not measured for this
+# run", e.g. FlopCounterMode couldn't trace this particular architecture;
+# callers must treat that as "omit the readout", never fabricate a number.
+_flops_per_unit = contextvars.ContextVar("autoanatomy_flops_per_unit", default=None)
+
 _PATCH_MARKER = "_autoanatomy_progress_patch"
 
 
@@ -77,7 +84,7 @@ class _CallbackTqdm(_real_tqdm):
         if callback is None:
             return
         try:
-            callback(self.n, self.total or 0, self._autoanatomy_desc)
+            callback(self.n, self.total or 0, self._autoanatomy_desc, _flops_per_unit.get())
         except Exception:
             # A bug in a UI-side callback must never break a real segmentation run.
             pass
@@ -88,17 +95,78 @@ def report_progress(callback):
     """Route nnU-Net's own real per-patch progress counter to `callback` for
     the duration of the `with` block.
 
-    callback(completed: int, total: int, desc: str | None) is invoked every
-    time nnU-Net's sliding-window loop finishes another tile (or the
-    background export step finishes another case) -- both real counts, not
-    estimates. Only observes an in-process run: does not span the separate
-    OS processes started by --parallel-tasks.
+    callback(completed: int, total: int, desc: str | None, flops_per_unit:
+    float | None) is invoked every time nnU-Net's sliding-window loop
+    finishes another tile (or the background export step finishes another
+    case) -- both counts are real, not estimates. flops_per_unit is the real,
+    measured FLOP cost of one such unit (see measure_flops_per_tile()), or
+    None if it wasn't measured/measurable for this run. Only observes an
+    in-process run: does not span the separate OS processes started by
+    --parallel-tasks.
     """
     token = _active_callback.set(callback)
     try:
         yield
     finally:
         _active_callback.reset(token)
+
+
+def set_flops_per_unit(value) -> None:
+    """Record the real, measured FLOP cost of one progress-counter unit
+    (one sliding-window tile, all its mirror-TTA variants included) for the
+    remainder of this run. Pass None to indicate "not measured" explicitly.
+    """
+    _flops_per_unit.set(value)
+
+
+def notify_progress(completed, total, description=None):
+    """Report a completed MONAI tile through the existing UI callback."""
+    callback = _active_callback.get()
+    if callback is not None:
+        try:
+            callback(completed, total, description, None)
+        except Exception:
+            pass
+
+
+def has_progress_callback():
+    return _active_callback.get() is not None
+
+
+def measure_flops_per_tile(predictor) -> float | None:
+    """Measure the real FLOP cost of running one sliding-window tile through
+    `predictor`'s network, including every mirror-TTA variant nnU-Net will
+    actually execute for it.
+
+    Uses torch's own FlopCounterMode traced over one real forward pass at the
+    predictor's actual patch size, on the network's actual device -- not an
+    estimate or a param-count heuristic. Returns None if measurement fails
+    for any reason (e.g. an architecture FlopCounterMode can't trace): a
+    missing TFLOPS readout must never take down a real segmentation run.
+    """
+    try:
+        import torch
+        from torch.utils.flop_counter import FlopCounterMode
+
+        network = predictor.network
+        patch_size = predictor.configuration_manager.patch_size
+        device = next(network.parameters()).device
+        in_channels = predictor.num_input_channels
+
+        dummy = torch.zeros((1, in_channels, *patch_size), device=device)
+        was_training = network.training
+        network.eval()
+        try:
+            with torch.no_grad(), FlopCounterMode(display=False) as flop_counter:
+                network(dummy)
+            flops_per_forward_pass = flop_counter.get_total_flops()
+        finally:
+            network.train(was_training)
+
+        num_variants = 2 ** len(predictor.allowed_mirroring_axes) if predictor.use_mirroring else 1
+        return float(flops_per_forward_pass * num_variants)
+    except Exception:
+        return None
 
 
 def patch_tqdm_progress() -> bool:

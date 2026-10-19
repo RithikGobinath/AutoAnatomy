@@ -3,7 +3,7 @@ import shutil
 import sys
 from pathlib import Path
 
-from autoanatomy.engine.registry import TASKS, ROADMAP_TASKS, format_classes_table, get_task_classes
+from autoanatomy.engine.registry import TASKS, TASK_SECTIONS, ROADMAP_TASKS, format_classes_table, get_task_classes
 
 # See autoanatomy/tui/screens/run_progress.py for why this guard exists:
 # nnU-Net's background export workers can hang/crash on a disk-full write in
@@ -133,9 +133,13 @@ def cmd_segment(args):
 
 
 def cmd_list_structures(args):
+    section = None
     for i, task in enumerate(TASKS):
         if i > 0:
             print()
+        if TASK_SECTIONS[task] != section:
+            section = TASK_SECTIONS[task]
+            print(section)
         print(format_classes_table(task))
     print()
     print("Planned for later phases (not yet segmentable in this build):")
@@ -161,7 +165,7 @@ def cmd_check(args):
     import shutil
     from autoanatomy.engine.config import get_totalseg_dir, get_weights_dir
     from autoanatomy.engine.registry import TASK_WEIGHT_IDS
-    from autoanatomy.engine.weights import WEIGHTS_FOLDER_NAMES
+    from autoanatomy.engine.weights import weights_are_cached
 
     home_dir = get_totalseg_dir()
     weights_dir = get_weights_dir()
@@ -169,7 +173,7 @@ def cmd_check(args):
     print(f"weights dir:    {weights_dir}")
 
     cached = {
-        task: all((weights_dir / WEIGHTS_FOLDER_NAMES[tid]).exists() for tid in task_ids)
+        task: all(weights_are_cached(tid) for tid in task_ids)
         for task, task_ids in TASK_WEIGHT_IDS.items()
     }
     print("weights cached: " + "  ".join(f"{task}={cached[task]}" for task in TASKS))

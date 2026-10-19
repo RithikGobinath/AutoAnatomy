@@ -18,3 +18,25 @@ Jakob Wasserthal (jakob.wasserthal@usb.ch) for a commercial license.
 dental_segmentator and head_muscles require no license for either use.
 
 See LICENSE for the full Apache 2.0 license text.
+
+Auto3DSeg integration
+--------------------
+The auto3dseg_muscles task uses MONAI's SegResNetDS architecture and the
+Whole Head Segmentation 0.5 mm v1.0.1 checkpoint published by the
+SlicerMONAIAuto3DSeg contributors (Andras Lasso, Andres Diaz-Pinto and
+contributors). Philippe Pellerin contributed the masticatory annotation
+work described in the associated Slicer community discussion.
+
+MONAI: https://github.com/Project-MONAI/MONAI (Apache-2.0).
+Slicer extension and reference inference implementation:
+https://github.com/lassoan/SlicerMONAIAuto3DSeg (MIT).
+The MIT notice is preserved in
+autoanatomy/engine/resources/SlicerMONAIAuto3DSeg-LICENSE.txt.
+Checkpoint source:
+https://github.com/lassoan/SlicerMONAIAuto3DSeg/releases/download/Models/whole-head-05mm-v1.0.1.zip
+
+The model weights are downloaded from their original publisher and are not
+included in AutoAnatomy's source or wheel. The publisher's model registry
+does not state a separate license for this checkpoint; AutoAnatomy's
+Apache-2.0 license does not grant rights to third-party weights or their
+training data. Consult the publisher for the applicable checkpoint terms.

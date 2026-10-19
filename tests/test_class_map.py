@@ -84,7 +84,13 @@ def test_individual_teeth_matches_upstream():
 
 
 def test_selectable_tasks():
-    assert TASKS == ["dental_segmentator", "head_muscles", "headneck_muscles", "individual_teeth"]
+    assert TASKS == ["dental_segmentator", "head_muscles", "headneck_muscles", "individual_teeth", "auto3dseg_muscles"]
+
+
+def test_auto3dseg_muscles_exposes_only_the_requested_groups():
+    assert class_map["auto3dseg_muscles"] == {
+        1: "masseter", 2: "temporalis", 3: "medial_pterygoid",
+    }
 
 
 def test_only_headneck_muscles_requires_a_license():

@@ -60,10 +60,9 @@ class SystemStatus(Static):
         try:
             from autoanatomy.engine.config import get_weights_dir
             from autoanatomy.engine.registry import TASK_WEIGHT_IDS
-            from autoanatomy.engine.weights import WEIGHTS_FOLDER_NAMES
-            weights_dir = get_weights_dir()
+            from autoanatomy.engine.weights import weights_are_cached
             all_cached = all(
-                (weights_dir / WEIGHTS_FOLDER_NAMES[task_id]).exists()
+                weights_are_cached(task_id)
                 for task_ids in TASK_WEIGHT_IDS.values()
                 for task_id in task_ids
             )

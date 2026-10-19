@@ -36,6 +36,10 @@ class SettingsScreen(Screen):
                     "is free for non-commercial use, no license needed."
                 )
             yield Static(license_text, classes="hint")
+            yield Static(
+                "Auto3DSeg uses a separately downloaded MONAI whole-head checkpoint. "
+                "See NOTICE for the source and checkpoint terms.", classes="hint",
+            )
             yield Button("Back", id="back-btn")
         yield Footer()
 

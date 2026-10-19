@@ -2,7 +2,7 @@
 
 Craniofacial CT segmentation — jaw, teeth, skull, mandibular canal, chewing
 and neck muscles — with a terminal GUI, built around a real nnU-Net inference
-engine.
+engine and MONAI Auto3DSeg.
 
 > **Status: under construction.** The segmentation engine is real (real
 > downloaded nnU-Net weights, real GPU/CPU inference, real DICOM/NIfTI I/O).
@@ -40,6 +40,38 @@ commercial use** (free for non-commercial use) — see [NOTICE](NOTICE).
 
 `dental_segmentator` and `head_muscles` need no license (free for commercial
 and non-commercial use alike); `headneck_muscles` is the one exception above.
+
+## Auto3DSeg
+
+The home screen has a separate **Auto3DSeg** section. Choose **Muscle
+segmentation**, load a conventional CT scan, then select the outputs:
+
+| Label | Output |
+|---|---|
+| 1 | `masseter` |
+| 2 | `temporalis` |
+| 3 | `medial_pterygoid` |
+
+Each mask includes **both left and right sides**. The additional
+`auto3dseg_muscles` task runs the pretrained MONAI **Whole Head Segmentation
+0.5 mm, v1.0.1** model. Its saved target spacing is approximately
+**0.457 × 0.459 × 0.458 mm**. The model's spacing tolerance is preserved;
+exports return to the original scan's dimensions and affine. Finer model
+spacing alone does not demonstrate better boundary accuracy.
+
+```bash
+autoanatomy segment -i scan.nii.gz -o out/ -ta auto3dseg_muscles
+autoanatomy segment -i scan.nii.gz -o muscles.nii.gz -ta auto3dseg_muscles --ml
+autoanatomy segment -i scan.nii.gz -o out/ -ta auto3dseg_muscles --structures masseter,temporalis
+```
+
+The first run downloads the 323 MB checkpoint from the
+[Slicer MONAI Auto3DSeg model release](https://github.com/lassoan/SlicerMONAIAuto3DSeg/releases/tag/Models).
+The archive and checkpoint are checked against pinned SHA-256 hashes; weights
+are loaded with PyTorch's restricted tensor loader. The original full classifier
+runs before filtering to the three requested muscles. This is an additional
+task; `head_muscles` continues to provide its separate left/right structures.
+See [NOTICE](NOTICE) for attribution and checkpoint terms.
 
 ## Quick start
 

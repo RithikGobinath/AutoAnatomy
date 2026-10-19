@@ -32,7 +32,8 @@ class SplashScreen(Screen):
                     "\n[b]Real engine[/b]: this build downloads and runs the actual nnU-Net "
                     "DentalSegmentator (task 112), head_muscles (task 777), and headneck_muscles "
                     "(tasks 778+779, license required for commercial use) models on real "
-                    "GPU/CPU hardware. No mocked inference.\n",
+                    "GPU/CPU hardware. Auto3DSeg adds masseter, temporalis and medial "
+                    "pterygoid segmentation using the MONAI whole-head model.\n",
                     classes="hint",
                 )
                 yield Static("[dim]Press ENTER or SPACE to continue...[/dim]")

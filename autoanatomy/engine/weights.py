@@ -94,6 +94,7 @@ WEIGHTS_FOLDER_NAMES = {
     779: "Dataset779_headneck_muscles_part2_492subj",
     121: "Dataset121_ToothFairy2_Teeth",
     123: "Dataset123_ToothFairy2fixed_teeth_spacing02_brd3px",
+    "whole-head-05mm-v1.0.1": "Auto3DSeg_whole-head-05mm-v1.0.1",
 }
 
 
@@ -122,7 +123,19 @@ def _download_toothseg_weights(config_dir):
         shutil.rmtree(wrapper, ignore_errors=True)
 
 
+
+def weights_are_cached(task_id):
+    if task_id == "whole-head-05mm-v1.0.1":
+        from autoanatomy.engine.auto3dseg_weights import weights_cached
+        return weights_cached()
+    return (get_weights_dir() / WEIGHTS_FOLDER_NAMES[task_id]).is_dir()
+
+
 def download_pretrained_weights(task_id):
+
+    if task_id == "whole-head-05mm-v1.0.1":
+        from autoanatomy.engine.auto3dseg_weights import download_weights
+        return download_weights()
 
     config_dir = get_weights_dir()
     config_dir.mkdir(exist_ok=True, parents=True)

@@ -9,6 +9,14 @@ from textual.widgets import Button, Footer, Header, Input, Static
 class LoadScanScreen(Screen):
     BINDINGS = [("escape", "app.pop_screen", "Back")]
 
+    def __init__(self, next_screen_factory=None, **kwargs):
+        """next_screen_factory: zero-arg callable returning the Screen to push
+        after a scan loads successfully. Defaults to ConfigureRunScreen (the
+        nnU-Net batch-task flow) -- pass a different factory to route into
+        another flow, e.g. the femur semi-automatic seed-painting screen."""
+        super().__init__(**kwargs)
+        self.next_screen_factory = next_screen_factory
+
     def compose(self) -> ComposeResult:
         yield Header()
         with VerticalScroll(classes="panel scroll-wrapper"):
@@ -66,5 +74,8 @@ class LoadScanScreen(Screen):
             return
 
         self.app.scan_path = path
-        from autoanatomy.tui.screens.configure_run import ConfigureRunScreen
-        self.app.push_screen(ConfigureRunScreen())
+        if self.next_screen_factory is not None:
+            self.app.push_screen(self.next_screen_factory())
+        else:
+            from autoanatomy.tui.screens.configure_run import ConfigureRunScreen
+            self.app.push_screen(ConfigureRunScreen())

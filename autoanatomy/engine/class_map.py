@@ -155,6 +155,13 @@ class_map = {
         11: "digastric_left"
     },
 
+    # MONAI whole-head labels 1/2/4, exposed as three bilateral groups.
+    "auto3dseg_muscles": {
+        1: "masseter",
+        2: "temporalis",
+        3: "medial_pterygoid",
+    },
+
     # Third AutoAnatomy product task: neck posture/swallowing muscles --
     # complementary to head_muscles' chewing muscles, zero structure overlap.
     # Upstream TotalSegmentator task_ids 778+779 (two-part ensemble, combined

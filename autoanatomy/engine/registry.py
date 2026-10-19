@@ -25,9 +25,23 @@ TASKS = [
     "head_muscles",
     "headneck_muscles",
     "individual_teeth",
+    "auto3dseg_muscles",
 ]
 
-# task -> the nnU-Net checkpoint task_id(s) it needs downloaded (see
+TASK_SECTIONS = {
+    "dental_segmentator": "Segmentation",
+    "head_muscles": "Segmentation",
+    "headneck_muscles": "Segmentation",
+    "individual_teeth": "Segmentation",
+    "auto3dseg_muscles": "Auto3DSeg",
+}
+
+TASK_TITLES = {
+    "auto3dseg_muscles": "Masseter, temporalis and medial pterygoid",
+}
+
+# task -> the checkpoint ID(s) it needs downloaded (nnU-Net integers or a
+# versioned MONAI model ID; see
 # engine/weights.py). Used by the CLI's download-weights/check commands so
 # they can't silently drift out of sync with which tasks actually exist.
 TASK_WEIGHT_IDS = {
@@ -35,6 +49,7 @@ TASK_WEIGHT_IDS = {
     "head_muscles": [777],
     "headneck_muscles": [778, 779],
     "individual_teeth": [121, 123],
+    "auto3dseg_muscles": ["whole-head-05mm-v1.0.1"],
 }
 
 # Other segmentation tasks planned for later phases. Not yet selectable --
@@ -57,7 +72,8 @@ TASK_DISPLAY_OFFSET = {
     "dental_segmentator": 200,
     "head_muscles": 100,
     "headneck_muscles": 300,
-    "individual_teeth": 400,
+    "auto3dseg_muscles": 400,
+    "individual_teeth": 500,
 }
 
 # Tasks that operate on MR images but whose name does not end in "_mr".
@@ -80,7 +96,10 @@ def task_modality(task):
 
 
 def requires_license(task):
-    """Whether the task needs a license (free for non-commercial use)."""
+    """Whether an upstream paid commercial license is required.
+
+    False does not assign a license to third-party checkpoints; see NOTICE.
+    """
     return task in commercial_models
 
 
@@ -145,6 +164,8 @@ def format_classes_table(task):
     """Human-readable index->name listing of the classes a task outputs."""
     classes = get_task_classes(task)
     lic = "license required" if requires_license(task) else "open license"
+    if task == "auto3dseg_muscles":
+        lic = "see NOTICE for checkpoint terms"
     lines = [f"Task '{task}'  [{task_modality(task)}, {lic}, {len(classes)} classes]", ""]
     for idx in sorted(classes):
         lines.append(f"{str(idx).rjust(4)}  {classes[idx]}")
